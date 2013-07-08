@@ -1,0 +1,34 @@
+<div id="wide-sidebar" class="row-fluid">
+    <div class="span2">
+        <ul class="nav nav-tabs nav-stacked">
+            <li class="navigation-active"><a href="#/registrations">Registrations</a></li>
+        </ul>
+    </div>
+    <div class="span8">
+        <div ng-switch="mode">
+            <div ng-switch-when="view">
+                <table class="table">
+                    <tbody>
+                    <tr>
+                        <td>Assigned UUID</td>
+                        <td>{{registration.assignedUuid}}</td>
+                    </tr>
+                    <tr>
+                        <td>Temporary UUID</td>
+                        <td>{{notification.temporaryUuid}}</td>
+                    </tr>
+                    <tr>
+                        <td>Submitted On</td>
+                        <td>{{notification.submitted}}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2">
+                            <button type="submit" ng-click="cancel()" class="btn">Close</button>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

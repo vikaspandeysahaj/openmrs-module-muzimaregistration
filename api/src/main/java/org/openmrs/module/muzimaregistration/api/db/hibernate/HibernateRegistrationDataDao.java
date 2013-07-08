@@ -18,6 +18,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.hibernate.Criteria;
 import org.hibernate.SessionFactory;
+import org.hibernate.criterion.Projections;
 import org.hibernate.criterion.Restrictions;
 import org.openmrs.module.muzima.api.db.hibernate.HibernateSingleClassDao;
 import org.openmrs.module.muzimaregistration.api.db.RegistrationDataDao;
@@ -85,11 +86,9 @@ public class HibernateRegistrationDataDao extends HibernateSingleClassDao<Regist
         if (!StringUtils.isBlank(temporaryUuid)) {
             criteria.add(Restrictions.eq("temporaryUuid", temporaryUuid));
         }
-
         if (!StringUtils.isBlank(assignedUuid)) {
             criteria.add(Restrictions.eq("assignedUuid", assignedUuid));
         }
-
         criteria.add(Restrictions.eq("voided", Boolean.FALSE));
         return criteria.list();
     }
@@ -120,13 +119,32 @@ public class HibernateRegistrationDataDao extends HibernateSingleClassDao<Regist
     /**
      * Get all registration data information from the database.
      *
+     * @param pageNumber the page number.
+     * @param pageSize   the page size.
      * @return all registration data in the database.
      */
     @Override
     @SuppressWarnings("unchecked")
-    public List<RegistrationData> getAllRegistrationData() {
+    public List<RegistrationData> getRegistrationData(final Integer pageNumber, final Integer pageSize) {
         Criteria criteria = getSessionFactory().getCurrentSession().createCriteria(mappedClass);
+        if (pageNumber != null) {
+            criteria.setFirstResult((pageNumber - 1) * pageSize);
+        }
+        if (pageSize != null) {
+            criteria.setMaxResults(pageSize);
+        }
         criteria.add(Restrictions.eq("voided", Boolean.FALSE));
         return criteria.list();
+    }
+
+    /**
+     * Count the number of registration data in the database.
+     * @return the number of registration data in the database.
+     */
+    public Integer countRegistrationData() {
+        Criteria criteria = getSessionFactory().getCurrentSession().createCriteria(mappedClass);
+        criteria.add(Restrictions.eq("voided", Boolean.FALSE));
+        criteria.setProjection(Projections.rowCount());
+        return (Integer) criteria.uniqueResult();
     }
 }

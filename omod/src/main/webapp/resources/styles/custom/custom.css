@@ -1,0 +1,16 @@
+.search-query-size {
+    -moz-box-sizing: content-box;
+}
+
+.bootstrap-scope {
+    font-size: 0.8em;
+}
+
+.navigation-active {
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.navigation-active > a {
+    text-decoration: none;
+}

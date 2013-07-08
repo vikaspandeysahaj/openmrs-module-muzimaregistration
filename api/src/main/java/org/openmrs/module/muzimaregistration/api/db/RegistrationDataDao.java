@@ -69,7 +69,15 @@ public interface RegistrationDataDao extends SingleClassDao<RegistrationData> {
     /**
      * Get all registration data information from the database.
      *
+     * @param pageNumber the page number.
+     * @param pageSize   the page size.
      * @return all registration data in the database.
      */
-    List<RegistrationData> getAllRegistrationData();
+    List<RegistrationData> getRegistrationData(final Integer pageNumber, final Integer pageSize);
+
+    /**
+     * Count the number of registration data in the database.
+     * @return the number of registration data in the database.
+     */
+    Integer countRegistrationData();
 }

@@ -77,10 +77,10 @@ public class RegistrationDataServiceImpl extends BaseOpenmrsService implements R
      */
     @Override
     public RegistrationData getRegistrationDataByTemporaryUuid(final String temporaryUuid) {
-        List<RegistrationData> registrationDatas = dao.getRegistrationData(temporaryUuid, StringUtils.EMPTY);
-        if (registrationDatas.size() == 1) {
-            return registrationDatas.get(0);
-        } else if (registrationDatas.size() > 1) {
+        List<RegistrationData> registrationDataList = dao.getRegistrationData(temporaryUuid, StringUtils.EMPTY);
+        if (registrationDataList.size() == 1) {
+            return registrationDataList.get(0);
+        } else if (registrationDataList.size() > 1) {
             throw new APIException("Unable to uniquely identify registration data!");
         } else {
             // the size = 0
@@ -123,10 +123,20 @@ public class RegistrationDataServiceImpl extends BaseOpenmrsService implements R
     /**
      * Get all registration data information from the database.
      *
+     * @param pageNumber the page number.
+     * @param pageSize   the page size.
      * @return all registration data in the database.
      */
     @Override
-    public List<RegistrationData> getAllRegistrationData() {
-        return dao.getAllRegistrationData();
+    public List<RegistrationData> getRegistrationData(final Integer pageNumber, final Integer pageSize) {
+        return dao.getRegistrationData(pageNumber, pageSize);
+    }
+
+    /**
+     * Count the number of registration data in the database.
+     * @return the number of registration data in the database.
+     */
+    public Integer countRegistrationData() {
+        return dao.countRegistrationData();
     }
 }

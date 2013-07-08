@@ -13,26 +13,32 @@
  */
 package org.openmrs.module.muzimaregistration.web.controller;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
+import org.openmrs.module.muzimaregistration.web.utils.WebConverter;
 import org.springframework.stereotype.Controller;
-import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * The main controller.
+ * TODO: Write brief description about the class here.
  */
 @Controller
-public class MuzimaRegistrationManageController {
-	
-	protected final Log log = LogFactory.getLog(getClass());
-	
-	@RequestMapping(value = "/module/muzimaregistration/manage", method = RequestMethod.GET)
-	public void manage(ModelMap model) {
-		model.addAttribute("user", Context.getAuthenticatedUser());
+@RequestMapping(value = "module/muzimaregistration/registration.json")
+public class RegistrationController {
+
+    @RequestMapping(method = RequestMethod.GET)
+    @ResponseBody
+    public Map<String, Object> getNotificationsFor(final @RequestParam(value = "uuid") String uuid) {
+        RegistrationDataService service = Context.getService(RegistrationDataService.class);
+        return WebConverter.convertRegistrationData(service.getRegistrationDataByUuid(uuid));
     }
 }
