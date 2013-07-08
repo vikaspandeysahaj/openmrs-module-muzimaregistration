@@ -11,6 +11,7 @@
                     <thead>
                     <tr>
                         <th>#</th>
+                        <th>Patient Name</th>
                         <th>Assigned UUID</th>
                         <th>Temporary UUID</th>
                         <th>Submitted On</th>
@@ -19,6 +20,7 @@
                     <tbody>
                     <tr ng-repeat="registration in registrations | orderBy:'submitted':true">
                         <td><a href="#/registration/{{registration.uuid}}">{{(currentPage - 1) * maxSize + $index + 1}}</a></td>
+                        <td>{{registration.patient.name}}</td>
                         <td>{{registration.assignedUuid}}</td>
                         <td>{{registration.temporaryUuid}}</td>
                         <td>{{registration.submitted}}</td>

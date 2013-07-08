@@ -4,11 +4,11 @@ function ViewRegistrationCtrl($scope, $location, $routeParams, $registrations) {
     // get the current notification
     $registrations.getRegistration($scope.uuid).
         then(function (response) {
-            $scope.error = response.data;
+            $scope.registration = response.data;
         });
 
     $scope.cancel = function () {
-        $location.path('/errors');
+        $location.path('/registrations');
     };
 }
 

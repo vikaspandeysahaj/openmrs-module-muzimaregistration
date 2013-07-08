@@ -5,30 +5,49 @@
         </ul>
     </div>
     <div class="span8">
-        <div ng-switch="mode">
-            <div ng-switch-when="view">
-                <table class="table">
-                    <tbody>
-                    <tr>
-                        <td>Assigned UUID</td>
-                        <td>{{registration.assignedUuid}}</td>
-                    </tr>
-                    <tr>
-                        <td>Temporary UUID</td>
-                        <td>{{notification.temporaryUuid}}</td>
-                    </tr>
-                    <tr>
-                        <td>Submitted On</td>
-                        <td>{{notification.submitted}}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2">
-                            <button type="submit" ng-click="cancel()" class="btn">Close</button>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+        <table class="table table-striped">
+            <tbody>
+            <tr>
+                <td>Temporary UUID</td>
+                <td>{{registration.temporaryUuid}}</td>
+            </tr>
+            <tr>
+                <td>Assigned UUID</td>
+                <td>{{registration.assignedUuid}}</td>
+            </tr>
+            <tr>
+                <td>Resolved Patient</td>
+                <td>
+                    <div class="span12">
+                        <div class="row">
+                            <div class="span3">Name</div>
+                            <div class="span6">{{registration.patient.name}}</div>
+                        </div>
+                        <div class="row">
+                            <div class="span3">Gender</div>
+                            <div class="span6">{{registration.patient.gender}}</div>
+                        </div>
+                        <div class="row">
+                            <div class="span3">Date of Birth</div>
+                            <div class="span6">{{registration.patient.birthdate}}</div>
+                        </div>
+                        <div class="row">
+                            <div class="span3">Identifier</div>
+                            <div class="span6">{{registration.patient.identifier}}</div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td>Submitted On</td>
+                <td>{{registration.submitted}}</td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <button type="submit" ng-click="cancel()" class="btn">Close</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
     </div>
 </div>

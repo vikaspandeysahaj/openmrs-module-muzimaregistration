@@ -13,6 +13,8 @@
  */
 package org.openmrs.module.muzimaregistration.web.utils;
 
+import org.openmrs.Patient;
+import org.openmrs.Person;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 
@@ -28,6 +30,15 @@ public class WebConverter {
         if (registrationData != null) {
             map.put("uuid", registrationData.getUuid());
             map.put("assignedUuid", registrationData.getAssignedUuid());
+
+            Patient patient = Context.getPatientService().getPatientByUuid(registrationData.getAssignedUuid());
+            Map<String, Object> patientMap = new HashMap<String, Object>();
+            patientMap.put("name", patient.getPersonName().getFullName());
+            patientMap.put("gender", patient.getGender());
+            patientMap.put("birthdate", Context.getDateFormat().format(patient.getBirthdate()));
+            patientMap.put("identifier", patient.getPatientIdentifier().getIdentifier());
+            map.put("patient", patientMap);
+
             map.put("temporaryUuid", registrationData.getTemporaryUuid());
             map.put("submitted", Context.getDateFormat().format(registrationData.getDateCreated()));
         }
