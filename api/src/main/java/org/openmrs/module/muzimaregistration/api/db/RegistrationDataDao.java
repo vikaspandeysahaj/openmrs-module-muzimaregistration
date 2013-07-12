@@ -79,5 +79,5 @@ public interface RegistrationDataDao extends SingleClassDao<RegistrationData> {
      * Count the number of registration data in the database.
      * @return the number of registration data in the database.
      */
-    Integer countRegistrationData();
+    Number countRegistrationData();
 }

@@ -136,7 +136,7 @@ public class RegistrationDataServiceImpl extends BaseOpenmrsService implements R
      * Count the number of registration data in the database.
      * @return the number of registration data in the database.
      */
-    public Integer countRegistrationData() {
+    public Number countRegistrationData() {
         return dao.countRegistrationData();
     }
 }

@@ -42,7 +42,7 @@ public class RegistrationsController {
             Map<String, Object> response = new HashMap<String, Object>();
             RegistrationDataService service = Context.getService(RegistrationDataService.class);
 
-            Integer pages = service.countRegistrationData();
+            int pages = (service.countRegistrationData().intValue() + pageSize - 1)/ pageSize;
 
             List<Object> objects = new ArrayList<Object>();
             for (RegistrationData notificationData : service.getRegistrationData(pageNumber, pageSize)) {

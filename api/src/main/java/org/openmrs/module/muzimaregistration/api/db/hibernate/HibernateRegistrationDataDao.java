@@ -141,10 +141,10 @@ public class HibernateRegistrationDataDao extends HibernateSingleClassDao<Regist
      * Count the number of registration data in the database.
      * @return the number of registration data in the database.
      */
-    public Integer countRegistrationData() {
+    public Number countRegistrationData() {
         Criteria criteria = getSessionFactory().getCurrentSession().createCriteria(mappedClass);
         criteria.add(Restrictions.eq("voided", Boolean.FALSE));
         criteria.setProjection(Projections.rowCount());
-        return (Integer) criteria.uniqueResult();
+        return (Number) criteria.uniqueResult();
     }
 }
