@@ -29,7 +29,12 @@
         -->
         <dependency>
             <groupId>org.openmrs.module</groupId>
-            <artifactId>muzima-api</artifactId>
+            <artifactId>muzima-omod</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.openmrs.module</groupId>
+            <artifactId>webservices.rest-omod</artifactId>
         </dependency>
 
 		<!-- Begin OpenMRS core -->
