@@ -30,6 +30,7 @@ import org.openmrs.module.muzima.model.QueueData;
 import org.openmrs.module.muzima.model.handler.QueueDataHandler;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
+import org.openmrs.module.muzimaregistration.utils.JsonUtils;
 
 import java.text.DateFormat;
 import java.text.ParseException;
@@ -44,8 +45,6 @@ import java.util.List;
 public class RegistrationQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "registration";
-
-    private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
     private final Log log = LogFactory.getLog(RegistrationQueueDataHandler.class);
 
@@ -64,14 +63,15 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
         String temporaryUuid = JsonPath.read(payload, "$['patient.uuid']");
         RegistrationData registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
         if (registrationData == null) {
+            // we can't find registration data for this uuid, process the registration form.
             Patient unsavedPatient = new Patient();
 
             PatientService patientService = Context.getPatientService();
             LocationService locationService = Context.getLocationService();
 
-            String identifier = JsonPath.read(payload, "$['patient.identifier']");
-            String identifierTypeUuid = JsonPath.read(payload, "$['patient.identifier_type']");
-            String locationUuid = JsonPath.read(payload, "$['patient.identifier_location']");
+            String identifier = JsonUtils.readAsString(payload, "$['patient.identifier']");
+            String identifierTypeUuid = JsonUtils.readAsString(payload, "$['patient.identifier_type']");
+            String locationUuid = JsonUtils.readAsString(payload, "$['patient.identifier_location']");
 
             PatientIdentifier patientIdentifier = new PatientIdentifier();
             patientIdentifier.setLocation(locationService.getLocationByUuid(locationUuid));
@@ -79,17 +79,17 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
             patientIdentifier.setIdentifier(identifier);
             unsavedPatient.addIdentifier(patientIdentifier);
 
-            String birthdate = JsonPath.read(payload, "$['patient.birthdate']");
-            String birthdateEstimated = JsonPath.read(payload, "$['patient.birthdate_estimated']");
-            String gender = JsonPath.read(payload, "$['patient.gender']");
+            Date birthdate = JsonUtils.readAsDate(payload, "$['patient.birthdate']");
+            boolean birthdateEstimated = JsonUtils.readAsBoolean(payload, "$['patient.birthdate_estimated']");
+            String gender = JsonUtils.readAsString(payload, "$['patient.gender']");
 
-            unsavedPatient.setBirthdate(parseDate(birthdate));
-            unsavedPatient.setBirthdateEstimated(Boolean.parseBoolean(birthdateEstimated));
+            unsavedPatient.setBirthdate(birthdate);
+            unsavedPatient.setBirthdateEstimated(birthdateEstimated);
             unsavedPatient.setGender(gender);
 
-            String givenName = JsonPath.read(payload, "$['patient.given_name']");
-            String middleName = JsonPath.read(payload, "$['patient.middle_name']");
-            String familyName = JsonPath.read(payload, "$['patient.family_name']");
+            String givenName = JsonUtils.readAsString(payload, "$['patient.given_name']");
+            String middleName = JsonUtils.readAsString(payload, "$['patient.middle_name']");
+            String familyName = JsonUtils.readAsString(payload, "$['patient.family_name']");
 
             PersonName personName = new PersonName();
             personName.setGivenName(givenName);
@@ -97,8 +97,8 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
             personName.setFamilyName(familyName);
             unsavedPatient.addName(personName);
 
-            String address1 = JsonPath.read(payload, "$['person_address.address1']");
-            String address2 = JsonPath.read(payload, "$['person_address.address2']");
+            String address1 = JsonUtils.readAsString(payload, "$['person_address.address1']");
+            String address2 = JsonUtils.readAsString(payload, "$['person_address.address2']");
 
             PersonAddress personAddress = new PersonAddress();
             personAddress.setAddress1(address1);
@@ -117,24 +117,21 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
 
             registrationData = new RegistrationData();
             registrationData.setTemporaryUuid(temporaryUuid);
+            String assignedUuid;
             // for a new patient we will create mapping:
-            // * temporary uuid --> temporary uuid
+            // * temporary uuid --> uuid of the newly created patient
             // for existing patient we will create mapping:
-            // * temporary uuid --> existing uuid
-            // we can't find registration data for this uuid, process the registration form.
-            String assignedUuid = temporaryUuid;
+            // * temporary uuid --> uuid of the existing patient
             if (savedPatient != null) {
                 // if we have a patient already saved with the characteristic found in the registration form:
                 // * we will map the temporary uuid to the existing uuid.
                 assignedUuid = savedPatient.getUuid();
+            } else {
+                Context.getPatientService().savePatient(unsavedPatient);
+                assignedUuid = unsavedPatient.getUuid();
             }
             registrationData.setAssignedUuid(assignedUuid);
             registrationDataService.saveRegistrationData(registrationData);
-
-            if (savedPatient == null) {
-                unsavedPatient.setUuid(assignedUuid);
-                Context.getPatientService().savePatient(unsavedPatient);
-            }
         }
     }
 
@@ -175,16 +172,6 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
             }
         }
         return null;
-    }
-
-    private Date parseDate(final String dateValue) {
-        Date date = null;
-        try {
-            date = dateFormat.parse(dateValue);
-        } catch (ParseException e) {
-            log.error("Unable to parse date data for encounter!", e);
-        }
-        return date;
     }
 
     /**
