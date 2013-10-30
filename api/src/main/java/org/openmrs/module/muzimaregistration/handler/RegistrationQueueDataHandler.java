@@ -155,18 +155,21 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
             if (StringUtils.isNotBlank(savedPersonName.getFullName())
                     && StringUtils.isNotBlank(unsavedPersonName.getFullName())) {
                 if (StringUtils.equalsIgnoreCase(patient.getGender(), unsavedPatient.getGender())) {
-                    String savedGivenName = savedPersonName.getGivenName();
-                    String unsavedGivenName = unsavedPersonName.getGivenName();
-                    int givenNameEditDistance = StringUtils.getLevenshteinDistance(
-                            StringUtils.lowerCase(savedGivenName),
-                            StringUtils.lowerCase(unsavedGivenName));
-                    String savedFamilyName = savedPersonName.getFamilyName();
-                    String unsavedFamilyName = unsavedPersonName.getFamilyName();
-                    int familyNameEditDistance = StringUtils.getLevenshteinDistance(
-                            StringUtils.lowerCase(savedFamilyName),
-                            StringUtils.lowerCase(unsavedFamilyName));
-                    if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
-                        return patient;
+                    if (patient.getBirthdate() != null && unsavedPatient.getBirthdate() != null
+                            && patient.getBirthdate().equals(unsavedPatient.getBirthdate())) {
+                        String savedGivenName = savedPersonName.getGivenName();
+                        String unsavedGivenName = unsavedPersonName.getGivenName();
+                        int givenNameEditDistance = StringUtils.getLevenshteinDistance(
+                                StringUtils.lowerCase(savedGivenName),
+                                StringUtils.lowerCase(unsavedGivenName));
+                        String savedFamilyName = savedPersonName.getFamilyName();
+                        String unsavedFamilyName = unsavedPersonName.getFamilyName();
+                        int familyNameEditDistance = StringUtils.getLevenshteinDistance(
+                                StringUtils.lowerCase(savedFamilyName),
+                                StringUtils.lowerCase(unsavedFamilyName));
+                        if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
+                            return patient;
+                        }
                     }
                 }
             }
