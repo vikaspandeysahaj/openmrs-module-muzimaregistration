@@ -137,18 +137,6 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
         for (Patient patient : patients) {
-            PatientIdentifier savedIdentifier = patient.getPatientIdentifier();
-            PatientIdentifier unsavedIdentifier = unsavedPatient.getPatientIdentifier();
-            if (StringUtils.isNotBlank(savedIdentifier.getIdentifier())
-                    && StringUtils.isNotBlank(unsavedIdentifier.getIdentifier())) {
-                int editDistance = StringUtils.getLevenshteinDistance(
-                        StringUtils.lowerCase(savedIdentifier.getIdentifier()),
-                        StringUtils.lowerCase(unsavedIdentifier.getIdentifier()));
-                // exact match on the patient identifier, they are the same patient.
-                if (editDistance == 0) {
-                    return patient;
-                }
-            }
             // match it using the person name and gender, what about the dob?
             PersonName savedPersonName = patient.getPersonName();
             PersonName unsavedPersonName = unsavedPatient.getPersonName();
@@ -168,7 +156,14 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                                 StringUtils.lowerCase(savedFamilyName),
                                 StringUtils.lowerCase(unsavedFamilyName));
                         if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
-                            return patient;
+                            for (PatientIdentifier savedIdentifier : patient.getActiveIdentifiers()) {
+                                PatientIdentifier unsavedIdentifier = unsavedPatient.getPatientIdentifier();
+                                if (savedIdentifier.getIdentifierType().equals(unsavedIdentifier.getIdentifierType())) {
+                                    if (StringUtils.equalsIgnoreCase(unsavedIdentifier.getIdentifier(), savedIdentifier.getIdentifier())) {
+                                        return patient;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
