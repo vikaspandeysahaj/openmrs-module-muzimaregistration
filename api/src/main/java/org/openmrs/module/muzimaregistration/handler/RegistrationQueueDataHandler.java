@@ -13,13 +13,12 @@
  */
 package org.openmrs.module.muzimaregistration.handler;
 
-import com.jayway.jsonpath.JsonPath;
+import net.minidev.json.JSONArray;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifier;
-import org.openmrs.PersonAddress;
 import org.openmrs.PersonName;
 import org.openmrs.annotation.Handler;
 import org.openmrs.api.LocationService;
@@ -45,10 +44,15 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
 
     private final Log log = LogFactory.getLog(RegistrationQueueDataHandler.class);
 
+    private PatientService patientService;
+    private LocationService locationService;
+
     /**
      * Implementation of how the queue data should be processed.
      *
      * @param queueData the queued data.
+     * @should create new patient from well formed registration data
+     * @should skip already processed registration data
      */
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
@@ -57,79 +61,98 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
 
         RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
 
-        String temporaryUuid = JsonPath.read(payload, "$['patient.uuid']");
-        RegistrationData registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
-        if (registrationData == null) {
-            // we can't find registration data for this uuid, process the registration form.
-            Patient unsavedPatient = new Patient();
+        RegistrationData registrationData;
+        String temporaryUuid = getStringFromJSON(payload, "patient.uuid");
+        if (StringUtils.isNotEmpty(temporaryUuid)) {
+            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
+            if (registrationData == null) {
+                // we can't find registration data for this uuid, process the registration form.
 
-            PatientService patientService = Context.getPatientService();
-            LocationService locationService = Context.getLocationService();
+                patientService = Context.getPatientService();
+                locationService = Context.getLocationService();
 
-            String identifier = JsonUtils.readAsString(payload, "$['patient.identifier']");
-            String identifierTypeUuid = JsonUtils.readAsString(payload, "$['patient.identifier_type']");
-            String locationUuid = JsonUtils.readAsString(payload, "$['patient.identifier_location']");
+                Patient unsavedPatient = createPatientFromPayload(payload);
 
-            PatientIdentifier patientIdentifier = new PatientIdentifier();
-            patientIdentifier.setLocation(locationService.getLocationByUuid(locationUuid));
-            patientIdentifier.setIdentifierType(patientService.getPatientIdentifierTypeByUuid(identifierTypeUuid));
-            patientIdentifier.setIdentifier(identifier);
-            unsavedPatient.addIdentifier(patientIdentifier);
+                Patient savedPatient;
+                // check whether we already have similar patients!
+                String identifier = unsavedPatient.getPatientIdentifier().getIdentifier();
+                if (!StringUtils.isBlank(identifier)) {
+                    List<Patient> patients = patientService.getPatients(identifier);
+                    savedPatient = findPatient(patients, unsavedPatient);
+                } else {
+                    List<Patient> patients = patientService.getPatients(unsavedPatient.getPersonName().getFullName());
+                    savedPatient = findPatient(patients, unsavedPatient);
+                }
 
-            Date birthdate = JsonUtils.readAsDate(payload, "$['patient.birthdate']");
-            boolean birthdateEstimated = JsonUtils.readAsBoolean(payload, "$['patient.birthdate_estimated']");
-            String gender = JsonUtils.readAsString(payload, "$['patient.gender']");
-
-            unsavedPatient.setBirthdate(birthdate);
-            unsavedPatient.setBirthdateEstimated(birthdateEstimated);
-            unsavedPatient.setGender(gender);
-
-            String givenName = JsonUtils.readAsString(payload, "$['patient.given_name']");
-            String middleName = JsonUtils.readAsString(payload, "$['patient.middle_name']");
-            String familyName = JsonUtils.readAsString(payload, "$['patient.family_name']");
-
-            PersonName personName = new PersonName();
-            personName.setGivenName(givenName);
-            personName.setMiddleName(middleName);
-            personName.setFamilyName(familyName);
-            unsavedPatient.addName(personName);
-
-            String address1 = JsonUtils.readAsString(payload, "$['person_address.address1']");
-            String address2 = JsonUtils.readAsString(payload, "$['person_address.address2']");
-
-            PersonAddress personAddress = new PersonAddress();
-            personAddress.setAddress1(address1);
-            personAddress.setAddress2(address2);
-            unsavedPatient.addAddress(personAddress);
-
-            Patient savedPatient;
-            // check whether we already have similar patients!
-            if (!StringUtils.isBlank(identifier)) {
-                List<Patient> patients = patientService.getPatients(identifier);
-                savedPatient = findPatient(patients, unsavedPatient);
-            } else {
-                List<Patient> patients = patientService.getPatients(personName.getFullName());
-                savedPatient = findPatient(patients, unsavedPatient);
+                registrationData = new RegistrationData();
+                registrationData.setTemporaryUuid(temporaryUuid);
+                String assignedUuid;
+                // for a new patient we will create mapping:
+                // * temporary uuid --> uuid of the newly created patient
+                // for existing patient we will create mapping:
+                // * temporary uuid --> uuid of the existing patient
+                if (savedPatient != null) {
+                    // if we have a patient already saved with the characteristic found in the registration form:
+                    // * we will map the temporary uuid to the existing uuid.
+                    assignedUuid = savedPatient.getUuid();
+                } else {
+                    patientService.savePatient(unsavedPatient);
+                    assignedUuid = unsavedPatient.getUuid();
+                }
+                registrationData.setAssignedUuid(assignedUuid);
+                registrationDataService.saveRegistrationData(registrationData);
             }
-
-            registrationData = new RegistrationData();
-            registrationData.setTemporaryUuid(temporaryUuid);
-            String assignedUuid;
-            // for a new patient we will create mapping:
-            // * temporary uuid --> uuid of the newly created patient
-            // for existing patient we will create mapping:
-            // * temporary uuid --> uuid of the existing patient
-            if (savedPatient != null) {
-                // if we have a patient already saved with the characteristic found in the registration form:
-                // * we will map the temporary uuid to the existing uuid.
-                assignedUuid = savedPatient.getUuid();
-            } else {
-                Context.getPatientService().savePatient(unsavedPatient);
-                assignedUuid = unsavedPatient.getUuid();
-            }
-            registrationData.setAssignedUuid(assignedUuid);
-            registrationDataService.saveRegistrationData(registrationData);
         }
+    }
+
+    /**
+     * Flag whether the current queue data handler can handle the queue data.
+     *
+     * @param queueData the queue data.
+     * @return true when the handler can handle the queue data.
+     */
+    @Override
+    public boolean accept(final QueueData queueData) {
+        return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
+    }
+
+    private Patient createPatientFromPayload(final String payload) {
+        Patient patient = new Patient();
+        PatientIdentifier patientIdentifier = new PatientIdentifier();
+        patientIdentifier.setLocation(locationService.getLocation(Integer.parseInt(getStringFromJSON(payload, "encounter.location_id"))));
+        patientIdentifier.setIdentifierType(patientService.getPatientIdentifierType(Integer.parseInt(getStringFromJSON(payload, "patient_identifier.identifier_type_id"))));
+        patientIdentifier.setIdentifier(getStringFromJSON(payload, "patient.medical_record_number"));
+        patient.addIdentifier(patientIdentifier);
+
+        patient.setBirthdate(getDateFromJSON(payload, "patient.birthdate"));
+        patient.setBirthdateEstimated(getBooleanFromJSON(payload, "patient.birthdate_estimated"));
+        patient.setGender(getStringFromJSON(payload, "patient.sex"));
+
+        PersonName personName = new PersonName();
+        personName.setGivenName(getStringFromJSON(payload, "patient.given_name"));
+        personName.setMiddleName(getStringFromJSON(payload, "patient.middle_name"));
+        personName.setFamilyName(getStringFromJSON(payload, "patient.family_name"));
+        patient.addName(personName);
+        return patient;
+    }
+
+    private Object getObjectFromPayload(final String payload, final String name) {
+        return JsonUtils.readAsObject(payload, "$['form']['fields'][?(@.name == '" + name + "')]");
+    }
+
+    private Boolean getBooleanFromJSON(final String payload, final String name) {
+        Object object = getObjectFromPayload(payload, name);
+        return JsonUtils.readAsBoolean(String.valueOf(((JSONArray) object).get(0)), "$['value']");
+    }
+
+    private String getStringFromJSON(final String payload, final String name) {
+        Object object = getObjectFromPayload(payload, name);
+        return JsonUtils.readAsString(String.valueOf(((JSONArray) object).get(0)), "$['value']");
+    }
+
+    private Date getDateFromJSON(final String payload, final String name) {
+        Object object = getObjectFromPayload(payload, name);
+        return JsonUtils.readAsDate(String.valueOf(((JSONArray) object).get(0)), "$['value']");
     }
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
@@ -169,14 +192,4 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
         return null;
     }
 
-    /**
-     * Flag whether the current queue data handler can handle the queue data.
-     *
-     * @param queueData the queue data.
-     * @return true when the handler can handle the queue data.
-     */
-    @Override
-    public boolean accept(final QueueData queueData) {
-        return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
-    }
 }
