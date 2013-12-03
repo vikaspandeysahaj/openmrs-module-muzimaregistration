@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -30,6 +31,8 @@ import java.util.List;
 public class JsonUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(JsonUtils.class.getSimpleName());
+
+    private static final String DATE_PATTERN = "yyyy-MM-dd";
 
     /**
      * Write boolean value into the json object. The method will only write the boolean value if the object passed
@@ -137,7 +140,7 @@ public class JsonUtils {
      * @param path   the path in the object.
      * @param value  the value to be assigned for the path.
      */
-    public static void writeAsDate(final Object object, final String path, final Date value) {
+    public static void writeAsDateTime(final Object object, final String path, final Date value) {
         if (object instanceof JSONObject) {
             JSONObject jsonObject = (JSONObject) object;
             String dateValue = null;
@@ -159,7 +162,7 @@ public class JsonUtils {
      * @return the date value in the json object. When the path is invalid, by default will return null.
      * @see @link <a href="http://en.wikipedia.org/wiki/ISO_8601">ISO-8601 Wikipedia Page</a>
      */
-    public static Date readAsDate(final String jsonObject, final String path) {
+    public static Date readAsDateTime(final String jsonObject, final String path) {
         Date returnedDate = null;
         try {
             String dateAsString = readAsString(jsonObject, path);
@@ -205,5 +208,43 @@ public class JsonUtils {
             logger.error("Unable to read object value with path: " + path + " from: " + String.valueOf(jsonObject));
         }
         return objects;
+    }
+
+    /**
+     * Write the day string of the date value into the json object. The method will only write the date value if the object passed
+     * as the first argument is an instance of <code>{@link JSONObject}</code>. Internally, the date will be
+     * converted into string of format yyyy-MM-dd without considering the timezone of the date. If the date
+     * is null, will write null value instead of empty string.
+     *
+     * @param object the <code>{@link JSONObject}</code> object
+     * @param path   the path in the object.
+     * @param date  the value to be assigned for the path.
+     */
+    public static void writeAsDate(final Object object, final String path, final Date date) {
+        if (object instanceof JSONObject && date != null) {
+            JSONObject jsonObject = (JSONObject) object;
+            jsonObject.put(path, new SimpleDateFormat(DATE_PATTERN).format(date));
+        }
+    }
+
+    /**
+     * Read date value from the json object. The value for the path must conform to the "yyyy-MM-dd"
+     * date format.
+     *
+     * @param serialized the serialized json object.
+     * @param path       the path inside the json object.
+     * @return the date value in the json object. When the path is invalid, by default will return null.
+     */
+    public static Date readAsDate(String serialized, String path) {
+        String dateAsString = readAsString(serialized, path);
+        if(dateAsString == null || dateAsString.length() == 0) {
+            return null;
+        }
+        try {
+            return new SimpleDateFormat(DATE_PATTERN).parse(dateAsString);
+        } catch (ParseException e) {
+            logger.error("Unable to convert string value from path: " + path + " from: " + String.valueOf(serialized));
+        }
+        return null;
     }
 }
