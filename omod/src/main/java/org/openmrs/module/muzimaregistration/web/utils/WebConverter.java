@@ -14,7 +14,6 @@
 package org.openmrs.module.muzimaregistration.web.utils;
 
 import org.openmrs.Patient;
-import org.openmrs.Person;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 

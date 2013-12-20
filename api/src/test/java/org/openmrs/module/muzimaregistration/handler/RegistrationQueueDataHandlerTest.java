@@ -13,7 +13,6 @@
  */
 package org.openmrs.module.muzimaregistration.handler;
 
-import net.minidev.json.JSONArray;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,10 +39,6 @@ import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Date;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.notNullValue;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.anyString;
@@ -105,7 +100,7 @@ public class RegistrationQueueDataHandlerTest  {
     }
 
     private String getPayloadFromFile() throws IOException {
-        final InputStream resourceAsStream = this.getClass().getResourceAsStream("well-formed-registration.json");
+        final InputStream resourceAsStream = this.getClass().getResourceAsStream("expected-well-formed-registration.json");
         BufferedReader reader = new BufferedReader(new InputStreamReader(resourceAsStream));
         String line;
         StringBuilder builder = new StringBuilder();
@@ -153,8 +148,7 @@ public class RegistrationQueueDataHandlerTest  {
     }
 
     private String getValueFromJSON(final String payload, final String name) {
-        Object temporaryUuidObject = JsonUtils.readAsObject(payload, "$['form']['fields'][?(@.name == '" + name + "')]");
-        return JsonUtils.readAsString(String.valueOf(((JSONArray) temporaryUuidObject).get(0)), "$['value']");
+        return  JsonUtils.readAsString(payload, "$['" + name + "']");
     }
 
 

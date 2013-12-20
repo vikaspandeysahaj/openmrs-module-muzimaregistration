@@ -13,11 +13,11 @@
  */
 package org.openmrs.module.muzimaregistration.api.model;
 
-import java.io.Serializable;
-
 import org.openmrs.BaseOpenmrsData;
-import org.openmrs.BaseOpenmrsObject;
 import org.openmrs.BaseOpenmrsMetadata;
+import org.openmrs.BaseOpenmrsObject;
+
+import java.io.Serializable;
 
 /**
  * It is a model class. It should extend either {@link BaseOpenmrsObject} or {@link BaseOpenmrsMetadata}.

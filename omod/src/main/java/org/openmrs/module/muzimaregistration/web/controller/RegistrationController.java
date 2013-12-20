@@ -15,7 +15,6 @@ package org.openmrs.module.muzimaregistration.web.controller;
 
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
-import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 import org.openmrs.module.muzimaregistration.web.utils.WebConverter;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,9 +22,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**

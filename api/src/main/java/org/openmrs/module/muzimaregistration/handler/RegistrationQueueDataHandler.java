@@ -13,12 +13,14 @@
  */
 package org.openmrs.module.muzimaregistration.handler;
 
-import net.minidev.json.JSONArray;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifier;
+import org.openmrs.PatientIdentifierType;
 import org.openmrs.PersonName;
 import org.openmrs.annotation.Handler;
 import org.openmrs.api.LocationService;
@@ -29,8 +31,21 @@ import org.openmrs.module.muzima.model.QueueData;
 import org.openmrs.module.muzima.model.handler.QueueDataHandler;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
-import org.openmrs.module.muzimaregistration.utils.JsonUtils;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
@@ -42,9 +57,12 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "registration";
 
+    private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
+
     private final Log log = LogFactory.getLog(RegistrationQueueDataHandler.class);
 
     private PatientService patientService;
+
     private LocationService locationService;
 
     /**
@@ -59,19 +77,16 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
         log.info("Processing registration form data: " + queueData.getUuid());
         String payload = queueData.getPayload();
 
+        Patient unsavedPatient = createPatientFromPayload(payload);
         RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
 
         RegistrationData registrationData;
-        String temporaryUuid = getStringFromJSON(payload, "patient.uuid");
-        if (StringUtils.isNotEmpty(temporaryUuid)) {
-            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
+        if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
+            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(unsavedPatient.getUuid());
             if (registrationData == null) {
                 // we can't find registration data for this uuid, process the registration form.
-
                 patientService = Context.getPatientService();
                 locationService = Context.getLocationService();
-
-                Patient unsavedPatient = createPatientFromPayload(payload);
 
                 Patient savedPatient;
                 // check whether we already have similar patients!
@@ -85,7 +100,7 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                 }
 
                 registrationData = new RegistrationData();
-                registrationData.setTemporaryUuid(temporaryUuid);
+                registrationData.setTemporaryUuid(unsavedPatient.getUuid());
                 String assignedUuid;
                 // for a new patient we will create mapping:
                 // * temporary uuid --> uuid of the newly created patient
@@ -116,43 +131,83 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
 
+    private Date parseDate(final String dateValue) {
+        Date date = null;
+        try {
+            date = dateFormat.parse(dateValue);
+        } catch (ParseException e) {
+            log.error("Unable to parse date data for encounter!", e);
+        }
+        return date;
+    }
+
     private Patient createPatientFromPayload(final String payload) {
-        Patient patient = new Patient();
-        PatientIdentifier patientIdentifier = new PatientIdentifier();
-        patientIdentifier.setLocation(locationService.getLocation(Integer.parseInt(getStringFromJSON(payload, "encounter.location_id"))));
-        patientIdentifier.setIdentifierType(patientService.getPatientIdentifierType(Integer.parseInt(getStringFromJSON(payload, "patient_identifier.identifier_type_id"))));
-        patientIdentifier.setIdentifier(getStringFromJSON(payload, "patient.medical_record_number"));
-        patient.addIdentifier(patientIdentifier);
+        Patient unsavedPatient = new Patient();
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document document = db.parse(new InputSource(new ByteArrayInputStream(payload.getBytes("utf-8"))));
 
-        patient.setBirthdate(getDateFromJSON(payload, "patient.birthdate"));
-        patient.setBirthdateEstimated(getBooleanFromJSON(payload, "patient.birthdate_estimated"));
-        patient.setGender(getStringFromJSON(payload, "patient.sex"));
+            Element element = document.getDocumentElement();
+            element.normalize();
 
-        PersonName personName = new PersonName();
-        personName.setGivenName(getStringFromJSON(payload, "patient.given_name"));
-        personName.setMiddleName(getStringFromJSON(payload, "patient.middle_name"));
-        personName.setFamilyName(getStringFromJSON(payload, "patient.family_name"));
-        patient.addName(personName);
-        return patient;
-    }
+            Node patientNode = document.getElementsByTagName("patient").item(0);
+            NodeList patientElementNodes = patientNode.getChildNodes();
 
-    private Object getObjectFromPayload(final String payload, final String name) {
-        return JsonUtils.readAsObject(payload, "$['form']['fields'][?(@.name == '" + name + "')]");
-    }
+            PersonName personName = new PersonName();
+            PatientIdentifier patientIdentifier = new PatientIdentifier();
+            for (int i = 0; i < patientElementNodes.getLength(); i++) {
+                Node patientElementNode = patientElementNodes.item(i);
+                if (patientElementNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element patientElement = (Element) patientElementNode;
+                    if (patientElement.getTagName().equals("patient.middle_name")) {
+                        personName.setMiddleName(patientElement.getTextContent());
+                    } else if (patientElement.getTagName().equals("patient.given_name")) {
+                        personName.setGivenName(patientElement.getTextContent());
+                    } else if (patientElement.getTagName().equals("patient.family_name")) {
+                        personName.setFamilyName(patientElement.getTextContent());
+                    } else if (patientElement.getTagName().equals("patient_identifier.identifier_type_id")) {
+                        int identifierTypeId = Integer.parseInt(patientElement.getTextContent());
+                        PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
+                        patientIdentifier.setIdentifierType(identifierType);
+                    } else if (patientElement.getTagName().equals("patient.medical_record_number")) {
+                        patientIdentifier.setIdentifier(patientElement.getTextContent());
+                    } else if (patientElement.getTagName().equals("patient.sex")) {
+                        unsavedPatient.setGender(patientElement.getTextContent());
+                    } else if (patientElement.getTagName().equals("patient.birthdate")) {
+                        Date dob = parseDate(patientElement.getTextContent());
+                        unsavedPatient.setBirthdate(dob);
+                    } else if (patientElement.getTagName().equals("patient.uuid")) {
+                        unsavedPatient.setUuid(patientElement.getTextContent());
+                    }
+                }
+            }
 
-    private Boolean getBooleanFromJSON(final String payload, final String name) {
-        Object object = getObjectFromPayload(payload, name);
-        return JsonUtils.readAsBoolean(String.valueOf(((JSONArray) object).get(0)), "$['value']");
-    }
+            Node encounterNode = document.getElementsByTagName("encounter").item(0);
+            NodeList encounterElementNodes = encounterNode.getChildNodes();
 
-    private String getStringFromJSON(final String payload, final String name) {
-        Object object = getObjectFromPayload(payload, name);
-        return JsonUtils.readAsString(String.valueOf(((JSONArray) object).get(0)), "$['value']");
-    }
+            for (int i = 0; i < encounterElementNodes.getLength(); i++) {
+                Node encounterElementNode = encounterElementNodes.item(i);
+                if (encounterElementNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element encounterElement = (Element) encounterElementNode;
+                    if (encounterElement.getTagName().equals("encounter.location_id")) {
+                        int locationId = Integer.parseInt(encounterElement.getTextContent());
+                        Location location = Context.getLocationService().getLocation(locationId);
+                        patientIdentifier.setLocation(location);
+                    }
+                }
+            }
 
-    private Date getDateFromJSON(final String payload, final String name) {
-        Object object = getObjectFromPayload(payload, name);
-        return JsonUtils.readAsDate(String.valueOf(((JSONArray) object).get(0)), "$['value']");
+            unsavedPatient.addName(personName);
+            unsavedPatient.addIdentifier(patientIdentifier);
+        } catch (ParserConfigurationException e) {
+            throw new QueueProcessorException(e);
+        } catch (SAXException e) {
+            throw new QueueProcessorException(e);
+        } catch (IOException e) {
+            throw new QueueProcessorException(e);
+        }
+        return unsavedPatient;
     }
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
@@ -164,7 +219,7 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                     && StringUtils.isNotBlank(unsavedPersonName.getFullName())) {
                 if (StringUtils.equalsIgnoreCase(patient.getGender(), unsavedPatient.getGender())) {
                     if (patient.getBirthdate() != null && unsavedPatient.getBirthdate() != null
-                            && patient.getBirthdate().equals(unsavedPatient.getBirthdate())) {
+                            && DateUtils.isSameDay(patient.getBirthdate(), unsavedPatient.getBirthdate())) {
                         String savedGivenName = savedPersonName.getGivenName();
                         String unsavedGivenName = unsavedPersonName.getGivenName();
                         int givenNameEditDistance = StringUtils.getLevenshteinDistance(

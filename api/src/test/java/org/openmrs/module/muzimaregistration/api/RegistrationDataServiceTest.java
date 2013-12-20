@@ -13,13 +13,13 @@
  */
 package org.openmrs.module.muzimaregistration.api;
 
-import static org.junit.Assert.*;
-
 import junit.framework.Assert;
 import org.junit.Test;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
+
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Tests {@link RegistrationDataService}.
