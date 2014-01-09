@@ -82,10 +82,9 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
             // we need to get the form id to get the encounter type associated with this form from the form record.
             encounter.setEncounterType(Context.getEncounterService().getEncounterType(1));
 
-            processObs(encounter, document.getElementsByTagName("obs"));
-            // we need to add the patient uuid
             processPatient(encounter, document.getElementsByTagName("patient"));
             processEncounter(encounter, document.getElementsByTagName("encounter"));
+            processObs(encounter, document.getElementsByTagName("obs"));
 
             Context.getEncounterService().saveEncounter(encounter);
         } catch (ParserConfigurationException e) {
@@ -207,49 +206,50 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
     private void processObs(final Encounter encounter, final NodeList obsNodeList) throws QueueProcessorException {
         Node obsNode = obsNodeList.item(0);
         NodeList obsElementNodes = obsNode.getChildNodes();
-        Set<Obs> obsSet = new HashSet<Obs>();
         for (int i = 0; i < obsElementNodes.getLength(); i++) {
             Node obsElementNode = obsElementNodes.item(i);
             // skip all top level obs nodes without child element or without attribute
             // no attribute: temporary elements
             // no child: element with no answer
             if (obsElementNode.hasAttributes() && obsElementNode.hasChildNodes()) {
-                obsSet.addAll(processObsNode(null, obsElementNode));
+                processObsNode(encounter, null, obsElementNode);
             }
         }
-        encounter.setObs(obsSet);
     }
 
-    private Set<Obs> processObsNode(final Obs parentObs, final Node obsElementNode) {
+    private void processObsNode(final Encounter encounter, final Obs parentObs, final Node obsElementNode) {
         Element obsElement = (Element) obsElementNode;
         String[] conceptElements = StringUtils.split(obsElement.getAttribute("concept"), "\\^");
         System.out.println("Concepts: " + obsElement.getAttribute("concept"));
         int conceptId = Integer.parseInt(conceptElements[0]);
         Concept concept = Context.getConceptService().getConcept(conceptId);
-        Set<Obs> obsSet = new HashSet<Obs>();
         if (concept.isSet()) {
             Obs obsGroup = new Obs();
             obsGroup.setConcept(concept);
+            obsGroup.setCreator(encounter.getCreator());
             NodeList nodeList = obsElementNode.getChildNodes();
             for (int i = 0; i < nodeList.getLength(); i++) {
                 Node subNode = nodeList.item(i);
                 // only process sub node with attribute and it is a tag
                 if (subNode.hasAttributes() && subNode.getNodeType() == Node.ELEMENT_NODE) {
                     // need to do recursive because we might have nested sets structure
-                    obsSet.addAll(processObsNode(obsGroup, subNode));
+                    encounter.addObs(obsGroup);
+                    processObsNode(encounter, obsGroup, subNode);
                 }
             }
         } else {
-            Obs obs = new Obs();
-            if (parentObs != null) {
-                obsSet.add(parentObs);
-                obs.setObsGroup(parentObs);
-            }
-            obs.setConcept(concept);
             Node valueNode = findSubNode("value", obsElementNode);
             if (valueNode != null) {
                 String value = StringUtils.trim(valueNode.getTextContent());
                 if (StringUtils.isNotEmpty(value)) {
+                    Obs obs = new Obs();
+                    obs.setConcept(concept);
+                    obs.setEncounter(encounter);
+                    obs.setPerson(encounter.getPatient());
+                    obs.setObsDatetime(encounter.getEncounterDatetime());
+                    obs.setLocation(encounter.getLocation());
+                    obs.setCreator(encounter.getCreator());
+                    // find the obs value :)
                     if (concept.getDatatype().isNumeric()) {
                         obs.setValueNumeric(Double.parseDouble(value));
                     } else if (concept.getDatatype().isDate()
@@ -264,7 +264,11 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
                     } else if (concept.getDatatype().isText()) {
                         obs.setValueText(value);
                     }
-                    obsSet.add(obs);
+                    // only add if the value is not empty :)
+                    encounter.addObs(obs);
+                    if (parentObs != null) {
+                        parentObs.addGroupMember(obs);
+                    }
                 }
             } else {
                 Node xformValuesNode = findSubNode("xforms_value", obsElementNode);
@@ -273,19 +277,29 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
                     for (String xformValue : xformValues) {
                         Node xformValueNode = findSubNode(xformValue, obsElementNode);
                         if (xformValueNode != null && xformValueNode.hasAttributes()) {
+                            Obs obs = new Obs();
+                            obs.setConcept(concept);
+                            obs.setEncounter(encounter);
+                            obs.setPerson(encounter.getPatient());
+                            obs.setObsDatetime(encounter.getEncounterDatetime());
+                            obs.setLocation(encounter.getLocation());
+                            obs.setCreator(encounter.getCreator());
+
                             Element xformValueElement = (Element) xformValueNode;
                             String[] valueCodedElements = StringUtils.split(xformValueElement.getAttribute("concept"), "\\^");
                             int valueCodedId = Integer.parseInt(valueCodedElements[0]);
                             Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
                             obs.setValueCoded(valueCoded);
-                            obsSet.add(obs);
+
+                            encounter.addObs(obs);
+                            if (parentObs != null) {
+                                parentObs.addGroupMember(obs);
+                            }
                         }
                     }
-
                 }
             }
         }
-        return obsSet;
     }
 
     private void processEncounter(final Encounter encounter, final NodeList encounterNodeList) throws QueueProcessorException {
@@ -306,6 +320,7 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
                     User user = Context.getUserService().getUserByUsername(encounterElement.getTextContent());
                     Person person = user.getPerson();
                     encounter.setProvider(person);
+                    encounter.setCreator(user);
                 }
             }
         }
