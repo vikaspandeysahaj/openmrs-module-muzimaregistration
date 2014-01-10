@@ -32,6 +32,8 @@ import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
 import org.openmrs.module.muzima.model.handler.QueueDataHandler;
+import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
+import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -136,6 +138,12 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
         Patient candidatePatient;
         if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
             candidatePatient = Context.getPatientService().getPatientByUuid(unsavedPatient.getUuid());
+            if (candidatePatient == null) {
+                String temporaryUuid = unsavedPatient.getUuid();
+                RegistrationDataService dataService = Context.getService(RegistrationDataService.class);
+                RegistrationData registrationData = dataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
+                candidatePatient = Context.getPatientService().getPatientByUuid(registrationData.getAssignedUuid());
+            }
         } else if (!StringUtils.isBlank(patientIdentifier.getIdentifier())) {
             List<Patient> patients = Context.getPatientService().getPatients(patientIdentifier.getIdentifier());
             candidatePatient = findPatient(patients, unsavedPatient);
