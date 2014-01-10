@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
 /**
  */
 @Component
-@Handler(supports = QueueData.class, order = 50)
+@Handler(supports = QueueData.class, order = 3)
 public class ObsQueueDataHandler implements QueueDataHandler {
 
     public static final String DISCRIMINATOR_VALUE = "obs";

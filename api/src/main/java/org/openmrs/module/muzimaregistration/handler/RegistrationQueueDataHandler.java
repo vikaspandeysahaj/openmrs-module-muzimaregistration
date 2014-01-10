@@ -52,7 +52,7 @@ import java.util.List;
 /**
  * TODO: Write brief description about the class here.
  */
-@Handler(supports = QueueData.class, order = 50)
+@Handler(supports = QueueData.class, order = 1)
 public class RegistrationQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "registration";

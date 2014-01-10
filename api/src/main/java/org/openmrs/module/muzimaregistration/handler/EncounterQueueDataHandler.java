@@ -58,7 +58,7 @@ import java.util.Set;
 /**
  */
 @Component
-@Handler(supports = QueueData.class, order = 50)
+@Handler(supports = QueueData.class, order = 2)
 public class EncounterQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "encounter";
