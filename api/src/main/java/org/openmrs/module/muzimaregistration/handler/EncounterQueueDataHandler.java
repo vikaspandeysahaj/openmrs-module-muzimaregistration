@@ -223,6 +223,12 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
         System.out.println("Concepts: " + obsElement.getAttribute("concept"));
         int conceptId = Integer.parseInt(conceptElements[0]);
         Concept concept = Context.getConceptService().getConcept(conceptId);
+
+        if (concept == null) {
+            log.info("Skipping obs creation, " + obsElement.getAttribute("concept") + " is not valid or not available.");
+            return;
+        }
+
         if (concept.isSet()) {
             Obs obsGroup = new Obs();
             obsGroup.setConcept(concept);
