@@ -51,21 +51,19 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  */
 @Component
 @Handler(supports = QueueData.class, order = 2)
-public class EncounterQueueDataHandler implements QueueDataHandler {
+public class XmlEncounterQueueDataHandler implements QueueDataHandler {
 
-    private static final String DISCRIMINATOR_VALUE = "encounter";
+    private static final String DISCRIMINATOR_VALUE = "xml-encounter";
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    private final Log log = LogFactory.getLog(EncounterQueueDataHandler.class);
+    private final Log log = LogFactory.getLog(XmlEncounterQueueDataHandler.class);
 
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
@@ -160,34 +158,27 @@ public class EncounterQueueDataHandler implements QueueDataHandler {
     }
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
+        String unsavedGivenName = unsavedPatient.getGivenName();
+        String unsavedFamilyName = unsavedPatient.getFamilyName();
+        PersonName unsavedPersonName = unsavedPatient.getPersonName();
         for (Patient patient : patients) {
             // match it using the person name and gender, what about the dob?
             PersonName savedPersonName = patient.getPersonName();
-            PersonName unsavedPersonName = unsavedPatient.getPersonName();
             if (StringUtils.isNotBlank(savedPersonName.getFullName())
                     && StringUtils.isNotBlank(unsavedPersonName.getFullName())) {
-                if (StringUtils.equalsIgnoreCase(patient.getGender(), unsavedPatient.getGender())) {
-                    if (patient.getBirthdate() != null && unsavedPatient.getBirthdate() != null
-                            && DateUtils.isSameDay(patient.getBirthdate(), unsavedPatient.getBirthdate())) {
-                        String savedGivenName = savedPersonName.getGivenName();
-                        String unsavedGivenName = unsavedPersonName.getGivenName();
-                        int givenNameEditDistance = StringUtils.getLevenshteinDistance(
-                                StringUtils.lowerCase(savedGivenName),
-                                StringUtils.lowerCase(unsavedGivenName));
-                        String savedFamilyName = savedPersonName.getFamilyName();
-                        String unsavedFamilyName = unsavedPersonName.getFamilyName();
-                        int familyNameEditDistance = StringUtils.getLevenshteinDistance(
-                                StringUtils.lowerCase(savedFamilyName),
-                                StringUtils.lowerCase(unsavedFamilyName));
-                        if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
-                            for (PatientIdentifier savedIdentifier : patient.getActiveIdentifiers()) {
-                                PatientIdentifier unsavedIdentifier = unsavedPatient.getPatientIdentifier();
-                                if (savedIdentifier.getIdentifierType().equals(unsavedIdentifier.getIdentifierType())) {
-                                    if (StringUtils.equalsIgnoreCase(unsavedIdentifier.getIdentifier(), savedIdentifier.getIdentifier())) {
-                                        return patient;
-                                    }
-                                }
-                            }
+                String savedGivenName = savedPersonName.getGivenName();
+                int givenNameEditDistance = StringUtils.getLevenshteinDistance(
+                        StringUtils.lowerCase(savedGivenName),
+                        StringUtils.lowerCase(unsavedGivenName));
+                String savedFamilyName = savedPersonName.getFamilyName();
+                int familyNameEditDistance = StringUtils.getLevenshteinDistance(
+                        StringUtils.lowerCase(savedFamilyName),
+                        StringUtils.lowerCase(unsavedFamilyName));
+                if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
+                    if (StringUtils.equalsIgnoreCase(patient.getGender(), unsavedPatient.getGender())) {
+                        if (patient.getBirthdate() != null && unsavedPatient.getBirthdate() != null
+                                && DateUtils.isSameDay(patient.getBirthdate(), unsavedPatient.getBirthdate())) {
+                            return patient;
                         }
                     }
                 }
