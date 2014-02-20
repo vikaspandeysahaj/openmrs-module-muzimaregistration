@@ -191,9 +191,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
                 if (concept.isSet()) {
                     Obs obsGroup = new Obs();
                     obsGroup.setConcept(concept);
-                    obsGroup.setCreator(encounter.getCreator());
                     processObsObject(encounter, obsGroup, obsJsonObject.get(conceptQuestion));
-                    encounter.addObs(obsGroup);
                     if (parentObs != null) {
                         parentObs.addGroupMember(obsGroup);
                     }
@@ -217,11 +215,6 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         String value = o.toString();
         Obs obs = new Obs();
         obs.setConcept(concept);
-        obs.setEncounter(encounter);
-        obs.setPerson(encounter.getPatient());
-        obs.setObsDatetime(encounter.getEncounterDatetime());
-        obs.setLocation(encounter.getLocation());
-        obs.setCreator(encounter.getCreator());
         // find the obs value :)
         if (concept.getDatatype().isNumeric()) {
             obs.setValueNumeric(Double.parseDouble(value));
@@ -249,10 +242,14 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         if (o instanceof JSONArray) {
             JSONArray jsonArray = (JSONArray) o;
             for (Object arrayElement : jsonArray) {
-                processObs(encounter, parentObs, arrayElement);
+                Obs obsGroup = new Obs();
+                obsGroup.setConcept(parentObs.getConcept());
+                processObs(encounter, obsGroup, arrayElement);
+                encounter.addObs(obsGroup);
             }
         } else if (o instanceof JSONObject) {
             processObs(encounter, parentObs, o);
+            encounter.addObs(parentObs);
         }
     }
 
