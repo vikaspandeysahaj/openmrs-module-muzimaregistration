@@ -16,6 +16,7 @@ package org.openmrs.module.muzimaregistration.handler;
 import net.minidev.json.JSONArray;
 import net.minidev.json.JSONObject;
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,7 +28,7 @@ import org.openmrs.Location;
 import org.openmrs.Obs;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifier;
-import org.openmrs.PersonAddress;
+import org.openmrs.PatientIdentifierType;
 import org.openmrs.PersonName;
 import org.openmrs.User;
 import org.openmrs.annotation.Handler;
@@ -64,15 +65,13 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
 
     public void process(final QueueData queueData) throws QueueProcessorException {
         log.info("Processing encounter form data: " + queueData.getUuid());
-        String payload = queueData.getPayload();
-
         Encounter encounter = new Encounter();
-
-        Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
-        processPatient(encounter, patientObject);
 
         Object encounterObject = JsonUtils.readAsObject(queueData.getPayload(), "$['encounter']");
         processEncounter(encounter, encounterObject);
+
+        Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
+        processPatient(encounter, patientObject);
 
         Object obsObject = JsonUtils.readAsObject(queueData.getPayload(), "$['observation']");
         processObs(encounter, null, obsObject);
@@ -84,22 +83,30 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         Patient unsavedPatient = new Patient();
         String patientPayload = patientObject.toString();
 
+        String uuid = JsonUtils.readAsString(patientPayload, "$['patient.uuid']");
+        unsavedPatient.setUuid(uuid);
+
         PatientService patientService = Context.getPatientService();
         LocationService locationService = Context.getLocationService();
+        PatientIdentifierType defaultIdentifierType = patientService.getPatientIdentifierType(1);
 
-        String identifier = JsonUtils.readAsString(patientPayload, "$['patient.identifier']");
+        String identifier = JsonUtils.readAsString(patientPayload, "$['patient.medical_record_number']");
         String identifierTypeUuid = JsonUtils.readAsString(patientPayload, "$['patient.identifier_type']");
         String locationUuid = JsonUtils.readAsString(patientPayload, "$['patient.identifier_location']");
 
         PatientIdentifier patientIdentifier = new PatientIdentifier();
-        patientIdentifier.setLocation(locationService.getLocationByUuid(locationUuid));
-        patientIdentifier.setIdentifierType(patientService.getPatientIdentifierTypeByUuid(identifierTypeUuid));
+        Location location = StringUtils.isNotBlank(locationUuid) ?
+                locationService.getLocationByUuid(locationUuid) : encounter.getLocation();
+        patientIdentifier.setLocation(location);
+        PatientIdentifierType patientIdentifierType = StringUtils.isNotBlank(identifierTypeUuid) ?
+                patientService.getPatientIdentifierTypeByUuid(identifierTypeUuid) : defaultIdentifierType;
+        patientIdentifier.setIdentifierType(patientIdentifierType);
         patientIdentifier.setIdentifier(identifier);
         unsavedPatient.addIdentifier(patientIdentifier);
 
         Date birthdate = JsonUtils.readAsDate(patientPayload, "$['patient.birthdate']");
         boolean birthdateEstimated = JsonUtils.readAsBoolean(patientPayload, "$['patient.birthdate_estimated']");
-        String gender = JsonUtils.readAsString(patientPayload, "$['patient.gender']");
+        String gender = JsonUtils.readAsString(patientPayload, "$['patient.sex']");
 
         unsavedPatient.setBirthdate(birthdate);
         unsavedPatient.setBirthdateEstimated(birthdateEstimated);
@@ -113,13 +120,6 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         personName.setGivenName(givenName);
         personName.setMiddleName(middleName);
         personName.setFamilyName(familyName);
-
-        String address1 = JsonUtils.readAsString(patientPayload, "$['person_address.address1']");
-        String address2 = JsonUtils.readAsString(patientPayload, "$['person_address.address2']");
-
-        PersonAddress personAddress = new PersonAddress();
-        personAddress.setAddress1(address1);
-        personAddress.setAddress2(address2);
 
         unsavedPatient.addName(personName);
         unsavedPatient.addIdentifier(patientIdentifier);
@@ -183,6 +183,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
             JSONObject obsJsonObject = (JSONObject) obsObject;
             for (String conceptQuestion : obsJsonObject.keySet()) {
                 String[] conceptElements = StringUtils.split(conceptQuestion, "\\^");
+                System.out.println("Question: " + conceptQuestion);
                 if (conceptElements.length < 3)
                     continue;
                 int conceptId = Integer.parseInt(conceptElements[0]);
@@ -198,36 +199,48 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
                     }
                 } else {
                     Object valueObject = obsJsonObject.get(conceptQuestion);
-                    String value = valueObject.toString();
-                    Obs obs = new Obs();
-                    obs.setConcept(concept);
-                    obs.setEncounter(encounter);
-                    obs.setPerson(encounter.getPatient());
-                    obs.setObsDatetime(encounter.getEncounterDatetime());
-                    obs.setLocation(encounter.getLocation());
-                    obs.setCreator(encounter.getCreator());
-                    // find the obs value :)
-                    if (concept.getDatatype().isNumeric()) {
-                        obs.setValueNumeric(Double.parseDouble(value));
-                    } else if (concept.getDatatype().isDate()
-                            || concept.getDatatype().isTime()
-                            || concept.getDatatype().isDateTime()) {
-                        obs.setValueDatetime(parseDate(value));
-                    } else if (concept.getDatatype().isCoded()) {
-                        String[] valueCodedElements = StringUtils.split(value, "\\^");
-                        int valueCodedId = Integer.parseInt(valueCodedElements[0]);
-                        Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
-                        obs.setValueCoded(valueCoded);
-                    } else if (concept.getDatatype().isText()) {
-                        obs.setValueText(value);
-                    }
-                    // only add if the value is not empty :)
-                    encounter.addObs(obs);
-                    if (parentObs != null) {
-                        parentObs.addGroupMember(obs);
+                    Object o = JsonUtils.readAsObject(valueObject.toString(), "$");
+                    if (o instanceof JSONArray) {
+                        JSONArray jsonArray = (JSONArray) o;
+                        for (Object arrayElement : jsonArray) {
+                            createObs(encounter, parentObs, concept, arrayElement);
+                        }
+                    } else {
+                        createObs(encounter, parentObs, concept, valueObject);
                     }
                 }
             }
+        }
+    }
+
+    private void createObs(final Encounter encounter, final Obs parentObs, final Concept concept, final Object o) {
+        String value = o.toString();
+        Obs obs = new Obs();
+        obs.setConcept(concept);
+        obs.setEncounter(encounter);
+        obs.setPerson(encounter.getPatient());
+        obs.setObsDatetime(encounter.getEncounterDatetime());
+        obs.setLocation(encounter.getLocation());
+        obs.setCreator(encounter.getCreator());
+        // find the obs value :)
+        if (concept.getDatatype().isNumeric()) {
+            obs.setValueNumeric(Double.parseDouble(value));
+        } else if (concept.getDatatype().isDate()
+                || concept.getDatatype().isTime()
+                || concept.getDatatype().isDateTime()) {
+            obs.setValueDatetime(parseDate(value));
+        } else if (concept.getDatatype().isCoded()) {
+            String[] valueCodedElements = StringUtils.split(value, "\\^");
+            int valueCodedId = Integer.parseInt(valueCodedElements[0]);
+            Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
+            obs.setValueCoded(valueCoded);
+        } else if (concept.getDatatype().isText()) {
+            obs.setValueText(value);
+        }
+        // only add if the value is not empty :)
+        encounter.addObs(obs);
+        if (parentObs != null) {
+            parentObs.addGroupMember(obs);
         }
     }
 
@@ -246,24 +259,27 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
     private void processEncounter(final Encounter encounter, final Object encounterObject) throws QueueProcessorException {
         String encounterPayload = encounterObject.toString();
 
-        String formUuid = JsonUtils.readAsString(encounterPayload, "$['encounter']['form.uuid']");
-        Form form = Context.getFormService().getFormByUuid(formUuid);
+        String formString = JsonUtils.readAsString(encounterPayload, "$['encounter.form_id']");
+        int formId = NumberUtils.toInt(formString, -999);
+        Form form = Context.getFormService().getForm(formId);
         encounter.setForm(form);
 
-        String encounterTypeUuid = JsonUtils.readAsString(encounterPayload, "$['encounter']['encounterType.uuid']");
-        EncounterType encounterType = Context.getEncounterService().getEncounterTypeByUuid(encounterTypeUuid);
+        String encounterTypeString = JsonUtils.readAsString(encounterPayload, "$['encounter.type_id']");
+        int encounterTypeId = NumberUtils.toInt(encounterTypeString, 1);
+        EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
         encounter.setEncounterType(encounterType);
 
-        String providerUuid = JsonUtils.readAsString(encounterPayload, "$['encounter']['provider.uuid']");
-        User user = Context.getUserService().getUserByUuid(providerUuid);
+        String providerString = JsonUtils.readAsString(encounterPayload, "$['encounter.provider_id_select']");
+        User user = Context.getUserService().getUserByUsername(providerString);
         encounter.setProvider(user);
 
-        String locationUuid = JsonUtils.readAsString(encounterPayload, "$['encounter']['location.uuid']");
-        Location location = Context.getLocationService().getLocationByUuid(locationUuid);
+        String locationString = JsonUtils.readAsString(encounterPayload, "$['encounter.location_id']");
+        int locationId = NumberUtils.toInt(locationString, -999);
+        Location location = Context.getLocationService().getLocation(locationId);
         encounter.setLocation(location);
 
-        String encounterDatetime = JsonUtils.readAsString(encounterPayload, "$['encounter']['datetime']");
-        encounter.setEncounterDatetime(parseDate(encounterDatetime));
+        Date encounterDatetime = JsonUtils.readAsDate(encounterPayload, "$['encounter.encounter_datetime']");
+        encounter.setEncounterDatetime(encounterDatetime);
     }
 
     private Date parseDate(final String dateValue) {
