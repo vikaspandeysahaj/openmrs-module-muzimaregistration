@@ -266,7 +266,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
         encounter.setEncounterType(encounterType);
 
-        String providerString = JsonUtils.readAsString(encounterPayload, "$['encounter.provider_id_select']");
+        String providerString = JsonUtils.readAsString(encounterPayload, "$['encounter.provider_id']");
         User user = Context.getUserService().getUserByUsername(providerString);
         encounter.setProvider(user);
 
