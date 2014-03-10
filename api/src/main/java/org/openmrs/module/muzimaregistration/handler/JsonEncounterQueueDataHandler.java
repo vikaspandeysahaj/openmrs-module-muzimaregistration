@@ -62,7 +62,6 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
     private final Log log = LogFactory.getLog(JsonEncounterQueueDataHandler.class);
 
     @Override
-
     public void process(final QueueData queueData) throws QueueProcessorException {
         log.info("Processing encounter form data: " + queueData.getUuid());
         Encounter encounter = new Encounter();
