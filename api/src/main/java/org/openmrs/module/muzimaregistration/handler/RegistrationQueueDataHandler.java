@@ -88,14 +88,17 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                 patientService = Context.getPatientService();
                 locationService = Context.getLocationService();
 
-                Patient savedPatient;
+                Patient savedPatient = null;
                 // check whether we already have similar patients!
-                String identifier = unsavedPatient.getPatientIdentifier().getIdentifier();
-                if (!StringUtils.isBlank(identifier)) {
-                    List<Patient> patients = patientService.getPatients(identifier);
-                    savedPatient = findPatient(patients, unsavedPatient);
+                if (unsavedPatient.getNames().isEmpty()) {
+                    PatientIdentifier identifier = unsavedPatient.getPatientIdentifier();
+                    if (identifier != null) {
+                        List<Patient> patients = patientService.getPatients(identifier.getIdentifier());
+                        savedPatient = findPatient(patients, unsavedPatient);
+                    }
                 } else {
-                    List<Patient> patients = patientService.getPatients(unsavedPatient.getPersonName().getFullName());
+                    PersonName personName = unsavedPatient.getPersonName();
+                    List<Patient> patients = patientService.getPatients(personName.getFullName());
                     savedPatient = findPatient(patients, unsavedPatient);
                 }
 
@@ -160,25 +163,42 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                 Node patientElementNode = patientElementNodes.item(i);
                 if (patientElementNode.getNodeType() == Node.ELEMENT_NODE) {
                     Element patientElement = (Element) patientElementNode;
-                    if (patientElement.getTagName().equals("patient.middle_name")) {
+                    String tagName = patientElement.getTagName();
+                    if (tagName.equals("patient.middle_name")) {
                         personName.setMiddleName(patientElement.getTextContent());
-                    } else if (patientElement.getTagName().equals("patient.given_name")) {
+                    } else if (tagName.equals("patient.given_name")) {
                         personName.setGivenName(patientElement.getTextContent());
-                    } else if (patientElement.getTagName().equals("patient.family_name")) {
+                    } else if (tagName.equals("patient.family_name")) {
                         personName.setFamilyName(patientElement.getTextContent());
-                    } else if (patientElement.getTagName().equals("patient_identifier.identifier_type_id")) {
+                    } else if (tagName.equals("patient_identifier.identifier_type_id")) {
                         int identifierTypeId = Integer.parseInt(patientElement.getTextContent());
                         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
                         patientIdentifier.setIdentifierType(identifierType);
-                    } else if (patientElement.getTagName().equals("patient.medical_record_number")) {
+                    } else if (tagName.equals("patient.medical_record_number")) {
                         patientIdentifier.setIdentifier(patientElement.getTextContent());
-                    } else if (patientElement.getTagName().equals("patient.sex")) {
+                    } else if (tagName.equals("patient.sex")) {
                         unsavedPatient.setGender(patientElement.getTextContent());
-                    } else if (patientElement.getTagName().equals("patient.birthdate")) {
+                    } else if (tagName.equals("patient.birthdate")) {
                         Date dob = parseDate(patientElement.getTextContent());
                         unsavedPatient.setBirthdate(dob);
-                    } else if (patientElement.getTagName().equals("patient.uuid")) {
+                    } else if (tagName.equals("patient.uuid")) {
                         unsavedPatient.setUuid(patientElement.getTextContent());
+                    } else if (tagName.equals("amrs_medical_record_number_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "AMRS Medical Record Number");
+                    } else if (tagName.equals("ccc_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "CCC Number ");
+                    } else if (tagName.equals("hct_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "HCT ID");
+                    } else if (tagName.equals("kni_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "KENYAN NATIONAL ID NUMBER");
+                    } else if (tagName.equals("mtct_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "MTCT Plus ID");
+                    } else if (tagName.equals("mtrh_hospital_number_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "MTRH Hospital Number");
+                    } else if (tagName.equals("old_amrs_number_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "Old AMPATH Medical Record Number");
+                    } else if (tagName.equals("pmtc_identifier_type")) {
+                        extractIdentifier(unsavedPatient, patientElement, "pMTCT ID");
                     }
                 }
             }
@@ -194,6 +214,9 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                         int locationId = Integer.parseInt(encounterElement.getTextContent());
                         Location location = Context.getLocationService().getLocation(locationId);
                         patientIdentifier.setLocation(location);
+                        for (PatientIdentifier identifier : unsavedPatient.getIdentifiers()) {
+                            identifier.setLocation(location);
+                        }
                     }
                 }
             }
@@ -208,6 +231,34 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
             throw new QueueProcessorException(e);
         }
         return unsavedPatient;
+    }
+
+    private void extractIdentifier(final Patient unsavedPatient, final Element patientElement, final String typeName) {
+        boolean identical = true;
+        String identifierValue = StringUtils.EMPTY;
+        NodeList identifierValueNodeList = patientElement.getChildNodes();
+        for (int j = 0; j < identifierValueNodeList.getLength(); j++) {
+            Node identifierValueNode = identifierValueNodeList.item(j);
+            if (identifierValueNode.getNodeType() == Node.ELEMENT_NODE) {
+                if (StringUtils.isEmpty(identifierValue)) {
+                    identifierValue = identifierValueNode.getTextContent();
+                } else {
+                    if (!StringUtils.equalsIgnoreCase(identifierValue, identifierValueNode.getTextContent())) {
+                        identical = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if (identical && StringUtils.isNotEmpty(identifierValue)) {
+            PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByName(typeName);
+            if (identifierType != null) {
+                PatientIdentifier patientIdentifier = new PatientIdentifier();
+                patientIdentifier.setIdentifierType(identifierType);
+                patientIdentifier.setIdentifier(identifierValue);
+                unsavedPatient.addIdentifier(patientIdentifier);
+            }
+        }
     }
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
@@ -231,14 +282,7 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                                 StringUtils.lowerCase(savedFamilyName),
                                 StringUtils.lowerCase(unsavedFamilyName));
                         if (givenNameEditDistance < 3 && familyNameEditDistance < 3) {
-                            for (PatientIdentifier savedIdentifier : patient.getActiveIdentifiers()) {
-                                PatientIdentifier unsavedIdentifier = unsavedPatient.getPatientIdentifier();
-                                if (savedIdentifier.getIdentifierType().equals(unsavedIdentifier.getIdentifierType())) {
-                                    if (StringUtils.equalsIgnoreCase(unsavedIdentifier.getIdentifier(), savedIdentifier.getIdentifier())) {
-                                        return patient;
-                                    }
-                                }
-                            }
+                            return patient;
                         }
                     }
                 }
