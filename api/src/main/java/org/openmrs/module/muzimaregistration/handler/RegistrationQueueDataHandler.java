@@ -14,6 +14,7 @@
 package org.openmrs.module.muzimaregistration.handler;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.math.NumberUtils;
 import org.apache.commons.lang.time.DateUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -21,10 +22,13 @@ import org.openmrs.Location;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifier;
 import org.openmrs.PatientIdentifierType;
+import org.openmrs.PersonAttribute;
+import org.openmrs.PersonAttributeType;
 import org.openmrs.PersonName;
 import org.openmrs.annotation.Handler;
 import org.openmrs.api.LocationService;
 import org.openmrs.api.PatientService;
+import org.openmrs.api.PersonService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
@@ -173,6 +177,9 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                     } else if (tagName.equals("patient_identifier.identifier_type_id")) {
                         int identifierTypeId = Integer.parseInt(patientElement.getTextContent());
                         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
+                        if (identifierType == null) {
+                            throw new QueueProcessorException("Unable to find patient identifier with id: " + identifierTypeId);
+                        }
                         patientIdentifier.setIdentifierType(identifierType);
                     } else if (tagName.equals("patient.medical_record_number")) {
                         patientIdentifier.setIdentifier(patientElement.getTextContent());
@@ -199,6 +206,18 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                         extractIdentifier(unsavedPatient, patientElement, "Old AMPATH Medical Record Number");
                     } else if (tagName.equals("pmtc_identifier_type")) {
                         extractIdentifier(unsavedPatient, patientElement, "pMTCT ID");
+                    } else if (tagName.startsWith("person_attribute")) {
+                        PersonService personService = Context.getPersonService();
+
+                        int personAttributeTypeId = NumberUtils.toInt(tagName.replace("person_attribute", ""));
+                        PersonAttributeType personAttributeType = personService.getPersonAttributeType(personAttributeTypeId);
+                        if (personAttributeType == null) {
+                            throw new QueueProcessorException("Unable to find attribute type with id: " + personAttributeTypeId);
+                        }
+                        PersonAttribute personAttribute = new PersonAttribute();
+                        personAttribute.setAttributeType(personAttributeType);
+                        personAttribute.setValue(patientElement.getTextContent());
+                        unsavedPatient.addAttribute(personAttribute);
                     }
                 }
             }
@@ -213,6 +232,9 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                     if (encounterElement.getTagName().equals("encounter.location_id")) {
                         int locationId = Integer.parseInt(encounterElement.getTextContent());
                         Location location = Context.getLocationService().getLocation(locationId);
+                        if (location == null) {
+                            throw new QueueProcessorException("Unable to find location with id: " + locationId);
+                        }
                         patientIdentifier.setLocation(location);
                         for (PatientIdentifier identifier : unsavedPatient.getIdentifiers()) {
                             identifier.setLocation(location);
@@ -257,6 +279,8 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                 patientIdentifier.setIdentifierType(identifierType);
                 patientIdentifier.setIdentifier(identifierValue);
                 unsavedPatient.addIdentifier(patientIdentifier);
+            } else {
+                throw new QueueProcessorException("Unable to find identifier type with name: " + typeName);
             }
         }
     }
