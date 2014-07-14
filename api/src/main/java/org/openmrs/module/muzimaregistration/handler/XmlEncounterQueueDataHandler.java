@@ -36,6 +36,8 @@ import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
 import org.openmrs.module.muzima.model.handler.QueueDataHandler;
+import org.openmrs.module.muzimaforms.MuzimaForm;
+import org.openmrs.module.muzimaforms.api.MuzimaFormService;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 import org.springframework.stereotype.Component;
@@ -345,16 +347,28 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                 } else if (encounterElement.getTagName().equals("encounter.form_uuid")) {
                     Form form = Context.getFormService().getForm(encounterElementValue);
                     if (form == null) {
-                        throw new QueueProcessorException("Unable to find form using the uuid: " + encounterElementValue);
+                        MuzimaFormService muzimaFormService = Context.getService(MuzimaFormService.class);
+                        MuzimaForm muzimaForm = muzimaFormService.findByUniqueId(encounterElementValue);
+                        if (muzimaForm != null) {
+                            Form formDefinition = Context.getFormService().getFormByUuid(muzimaForm.getForm());
+                            encounter.setForm(formDefinition);
+                            encounter.setEncounterType(formDefinition.getEncounterType());
+                        } else {
+                            log.info("Unable to find form using the uuid: " + encounterElementValue + ". Setting the form field to null!");
+                        }
+                    } else {
+                        encounter.setForm(form);
+                        encounter.setEncounterType(form.getEncounterType());
                     }
-                    encounter.setForm(form);
                 } else if (encounterElement.getTagName().equals("encounter.encounter_type")) {
-                    int encounterTypeId = NumberUtils.toInt(encounterElementValue, 1);
-                    EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
-                    if (encounterType == null) {
-                        throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterElementValue);
+                    if (encounter.getEncounterType() == null) {
+                        int encounterTypeId = NumberUtils.toInt(encounterElementValue, 1);
+                        EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
+                        if (encounterType == null) {
+                            throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterElementValue);
+                        }
+                        encounter.setEncounterType(encounterType);
                     }
-                    encounter.setEncounterType(encounterType);
                 }
             }
         }

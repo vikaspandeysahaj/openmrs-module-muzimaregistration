@@ -39,6 +39,8 @@ import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
 import org.openmrs.module.muzima.model.handler.QueueDataHandler;
+import org.openmrs.module.muzimaforms.MuzimaForm;
+import org.openmrs.module.muzimaforms.api.MuzimaFormService;
 import org.openmrs.module.muzimaregistration.api.RegistrationDataService;
 import org.openmrs.module.muzimaregistration.api.model.RegistrationData;
 import org.openmrs.module.muzimaregistration.utils.JsonUtils;
@@ -262,17 +264,26 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         String formUuid = JsonUtils.readAsString(encounterPayload, "$['encounter.form_uuid']");
         Form form = Context.getFormService().getForm(formUuid);
         if (form == null) {
-            throw new QueueProcessorException("Unable to find form using the uuid: " + formUuid);
+            MuzimaFormService muzimaFormService = Context.getService(MuzimaFormService.class);
+            MuzimaForm muzimaForm = muzimaFormService.findByUniqueId(formUuid);
+            if (muzimaForm != null) {
+                Form formDefinition = Context.getFormService().getFormByUuid(muzimaForm.getForm());
+                encounter.setForm(formDefinition);
+                encounter.setEncounterType(formDefinition.getEncounterType());
+            } else {
+                log.info("Unable to find form using the uuid: " + formUuid + ". Setting the form field to null!");
+                String encounterTypeString = JsonUtils.readAsString(encounterPayload, "$['encounter.type_id']");
+                int encounterTypeId = NumberUtils.toInt(encounterTypeString, 1);
+                EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
+                if (encounterType == null) {
+                    throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterTypeString);
+                }
+                encounter.setEncounterType(encounterType);
+            }
+        } else {
+            encounter.setForm(form);
+            encounter.setEncounterType(form.getEncounterType());
         }
-        encounter.setForm(form);
-
-        String encounterTypeString = JsonUtils.readAsString(encounterPayload, "$['encounter.type_id']");
-        int encounterTypeId = NumberUtils.toInt(encounterTypeString, 1);
-        EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
-        if (encounterType == null) {
-            throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterTypeString);
-        }
-        encounter.setEncounterType(encounterType);
 
         String providerString = JsonUtils.readAsString(encounterPayload, "$['encounter.provider_id']");
         User user = Context.getUserService().getUserByUsername(providerString);
