@@ -262,7 +262,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         String encounterPayload = encounterObject.toString();
 
         String formUuid = JsonUtils.readAsString(encounterPayload, "$['encounter.form_uuid']");
-        Form form = Context.getFormService().getForm(formUuid);
+        Form form = Context.getFormService().getFormByUuid(formUuid);
         if (form == null) {
             MuzimaFormService muzimaFormService = Context.getService(MuzimaFormService.class);
             MuzimaForm muzimaForm = muzimaFormService.findByUniqueId(formUuid);

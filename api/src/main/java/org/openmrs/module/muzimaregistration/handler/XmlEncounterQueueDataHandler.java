@@ -345,7 +345,7 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                     encounter.setProvider(user);
                     encounter.setCreator(user);
                 } else if (encounterElement.getTagName().equals("encounter.form_uuid")) {
-                    Form form = Context.getFormService().getForm(encounterElementValue);
+                    Form form = Context.getFormService().getFormByUuid(encounterElementValue);
                     if (form == null) {
                         MuzimaFormService muzimaFormService = Context.getService(MuzimaFormService.class);
                         MuzimaForm muzimaForm = muzimaFormService.findByUniqueId(encounterElementValue);
