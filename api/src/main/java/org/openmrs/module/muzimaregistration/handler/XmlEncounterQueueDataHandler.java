@@ -362,7 +362,7 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                     }
                 } else if (encounterElement.getTagName().equals("encounter.encounter_type")) {
                     if (encounter.getEncounterType() == null) {
-                        int encounterTypeId = NumberUtils.toInt(encounterElementValue, 1);
+                        int encounterTypeId = NumberUtils.toInt(encounterElementValue, -999);
                         EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
                         if (encounterType == null) {
                             throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterElementValue);
