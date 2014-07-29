@@ -178,7 +178,7 @@ public class RegistrationQueueDataHandler implements QueueDataHandler {
                         int identifierTypeId = Integer.parseInt(patientElement.getTextContent());
                         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
                         if (identifierType == null) {
-                            throw new QueueProcessorException("Unable to find patient identifier with id: " + identifierTypeId);
+                            throw new QueueProcessorException("Unable to find patient identifier type with id: " + identifierTypeId);
                         }
                         patientIdentifier.setIdentifierType(identifierType);
                     } else if (tagName.equals("patient.medical_record_number")) {
