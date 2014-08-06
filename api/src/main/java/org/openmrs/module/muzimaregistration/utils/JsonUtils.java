@@ -241,6 +241,8 @@ public class JsonUtils {
             return null;
         }
         try {
+            if(dateAsString.contains("/"))
+                return new SimpleDateFormat(DATE_PATTERN).parse(dateAsString.replace("/","-"));
             return new SimpleDateFormat(DATE_PATTERN).parse(dateAsString);
         } catch (ParseException e) {
             logger.error("Unable to convert string value from path: " + path + " from: " + String.valueOf(serialized));
