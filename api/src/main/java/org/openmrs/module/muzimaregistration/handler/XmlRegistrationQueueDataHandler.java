@@ -57,13 +57,13 @@ import java.util.List;
  * TODO: Write brief description about the class here.
  */
 @Handler(supports = QueueData.class, order = 1)
-public class RegistrationQueueDataHandler implements QueueDataHandler {
+public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
 
-    private static final String DISCRIMINATOR_VALUE = "registration";
+    private static final String DISCRIMINATOR_VALUE = "xml-registration";
 
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
 
-    private final Log log = LogFactory.getLog(RegistrationQueueDataHandler.class);
+    private final Log log = LogFactory.getLog(XmlRegistrationQueueDataHandler.class);
 
     private PatientService patientService;
 

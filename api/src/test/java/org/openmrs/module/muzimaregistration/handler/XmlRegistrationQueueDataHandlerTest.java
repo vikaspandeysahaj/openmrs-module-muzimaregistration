@@ -52,10 +52,10 @@ import static org.mockito.Mockito.when;
  */
 @RunWith(PowerMockRunner.class)
 @PrepareForTest(Context.class)
-public class RegistrationQueueDataHandlerTest  {
+public class XmlRegistrationQueueDataHandlerTest {
     /**
      * @verifies create new patient from well formed registration data
-     * @see RegistrationQueueDataHandler#process(org.openmrs.module.muzima.model.QueueData)
+     * @see XmlRegistrationQueueDataHandler#process(org.openmrs.module.muzima.model.QueueData)
      */
     @Test
     public void process_shouldCreateNewPatientFromWellFormedRegistrationData() throws Exception {
@@ -79,11 +79,11 @@ public class RegistrationQueueDataHandlerTest  {
         Object payload = JsonUtils.readAsObject(registrationFormData, "$['payload']");
         String temporaryUuid = getValueFromJSON(String.valueOf(payload), "patient.uuid");
 
-        RegistrationQueueDataHandler registrationQueueDataHandler = new RegistrationQueueDataHandler();
+        XmlRegistrationQueueDataHandler xmlRegistrationQueueDataHandler = new XmlRegistrationQueueDataHandler();
 
         final QueueData queueData = new QueueData();
         queueData.setPayload(String.valueOf(payload));
-        registrationQueueDataHandler.process(queueData);
+        xmlRegistrationQueueDataHandler.process(queueData);
 
         String identifier = getValueFromJSON(String.valueOf(payload), "patient.medical_record_number");
 
@@ -113,7 +113,7 @@ public class RegistrationQueueDataHandlerTest  {
 
     /**
      * @verifies skip already processed registration data
-     * @see RegistrationQueueDataHandler#process(org.openmrs.module.muzima.model.QueueData)
+     * @see XmlRegistrationQueueDataHandler#process(org.openmrs.module.muzima.model.QueueData)
      */
     @Test
     public void process_shouldSkipAlreadyProcessedRegistrationData() throws Exception {
