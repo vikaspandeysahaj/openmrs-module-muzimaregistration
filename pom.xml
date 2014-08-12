@@ -5,14 +5,14 @@
 
     <groupId>org.openmrs.module</groupId>
     <artifactId>muzimaregistration</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Muzima Registration Module</name>
     <description>
         Muzima module which will provide default implementation of form processors to process registration and
         encounter form.
     </description>
-    <url>https://wiki.openmrs.org/display/docs/Muzima+Default+Form+Processors+Module+Module</url>
+    <url>https://github.com/muzima/documentation/wiki/Form-Processing-Mechanism</url>
 
     <developers>
         <developer>
@@ -26,10 +26,10 @@
     </organization>
 
     <scm>
-        <connection>scm:svn:https:/github.com/muzima/muzimaregistration/</connection>
-        <developerConnection>scm:svn:https:/github.com/muzima/muzimaregistration/</developerConnection>
-        <url>https:/github.com/muzima/muzimaregistration/</url>
-    </scm>
+        <connection>scm:git:https://github.com/muzima/openmrs-module-muzimaregistration/</connection>
+        <developerConnection>scm:git:https://github.com/muzima/openmrs-module-muzimaregistration</developerConnection>
+        <url>https://github.com/muzima/openmrs-module-muzimaregistration</url>
+  </scm>
 
     <modules>
         <module>api</module>
@@ -38,7 +38,7 @@
 
     <properties>
         <muzimaVersion>1.0.0</muzimaVersion>
-        <muzimaFormsVersion>0.1-SNAPSHOT</muzimaFormsVersion>
+        <muzimaFormsVersion>1.0.0</muzimaFormsVersion>
         <openMRSVersion>1.8.2</openMRSVersion>
         <webservicesRestVersion>2.1</webservicesRestVersion>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
