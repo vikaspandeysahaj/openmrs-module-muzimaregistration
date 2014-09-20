@@ -32,7 +32,7 @@ public class JsonUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(JsonUtils.class.getSimpleName());
 
-    private static final String DATE_PATTERN = "yyyy-MM-dd";
+    private static final String DATE_PATTERN = "dd-MM-yyyy";
 
     /**
      * Write boolean value into the json object. The method will only write the boolean value if the object passed
