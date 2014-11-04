@@ -19,9 +19,12 @@ import org.apache.commons.logging.LogFactory;
 import org.openmrs.Patient;
 import org.openmrs.PatientIdentifier;
 import org.openmrs.PatientIdentifierType;
+import org.openmrs.PersonAttribute;
+import org.openmrs.PersonAttributeType;
 import org.openmrs.PersonName;
 import org.openmrs.annotation.Handler;
 import org.openmrs.api.PatientService;
+import org.openmrs.api.PersonService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
@@ -51,7 +54,6 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
     }
 
     private void processPatient(final Object patientObject) throws QueueProcessorException {
-
         String patientPayload = patientObject.toString();
         String uuid = JsonUtils.readAsString(patientPayload, "$['patient.uuid']");
         Patient unsavedPatient = Context.getPatientService().getPatientByUuid(uuid);
@@ -78,6 +80,27 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
         personName.setGivenName(givenName);
         personName.setMiddleName(middleName);
         personName.setFamilyName(familyName);
+        String patientsFinger = JsonUtils.readAsString(patientPayload, "$['patient.finger']");
+        String patientsFingerprint = JsonUtils.readAsString(patientPayload, "$['patient.fingerprint']");
+        PersonService personService = Context.getPersonService();
+        PersonAttributeType fingerprintAttributeType = personService.getPersonAttributeTypeByName("fingerprint");
+        PersonAttributeType fingerAttributeType = personService.getPersonAttributeTypeByName("finger");
+        PersonAttribute personAttributeFingerprint = unsavedPatient.getAttribute("fingerprint");
+        PersonAttribute personAttributeFinger = unsavedPatient.getAttribute("finger");
+        if (personAttributeFingerprint != null && personAttributeFinger != null) {
+            personAttributeFinger.setAttributeType(fingerAttributeType);
+            personAttributeFinger.setValue(patientsFinger);
+            personAttributeFingerprint.setAttributeType(fingerprintAttributeType);
+            personAttributeFingerprint.setValue(patientsFingerprint);
+        } else if (fingerprintAttributeType != null && fingerAttributeType != null) {
+            PersonAttribute fingerAttribute = new PersonAttribute();
+            fingerAttribute.setAttributeType(fingerAttributeType);
+            fingerAttribute.setValue(patientsFinger);
+            PersonAttribute fingerprintAttribute = new PersonAttribute();
+            fingerprintAttribute.setAttributeType(fingerprintAttributeType);
+            fingerprintAttribute.setValue(patientsFingerprint);
+            unsavedPatient.addAttribute(fingerprintAttribute);
+        }
         Context.getPatientService().savePatient(unsavedPatient);
     }
 
