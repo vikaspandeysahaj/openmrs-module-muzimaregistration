@@ -24,9 +24,7 @@ import org.openmrs.PatientIdentifier;
 import org.openmrs.PatientIdentifierType;
 import org.openmrs.PersonName;
 import org.openmrs.annotation.Handler;
-import org.openmrs.api.LocationService;
 import org.openmrs.api.PatientService;
-import org.openmrs.api.PersonService;
 import org.openmrs.api.context.Context;
 import org.openmrs.module.muzima.exception.QueueProcessorException;
 import org.openmrs.module.muzima.model.QueueData;
@@ -143,7 +141,7 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         patientIdentifiers.add(getPreferredPatientIdentifier(payload));
 
         List<PatientIdentifier> otherIdentifiers = getOtherPatientIdentifiers(payload);
-        if(!otherIdentifiers.equals(null))
+        if(!otherIdentifiers.isEmpty())
             patientIdentifiers.addAll(otherIdentifiers);
 
         String locationId = JsonUtils.readAsString(payload, "$['encounter.location_id']");
@@ -162,8 +160,8 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
     }
     private List<PatientIdentifier> getOtherPatientIdentifiers(String patientPayload){
         List<PatientIdentifier> otherIdentifiers = new ArrayList<PatientIdentifier>();
-        Object identifierTypeNameObject = JsonUtils.readAsObject(patientPayload,"patient.other_identifier_type");
-        Object identifierValueObject =JsonUtils.readAsObject(patientPayload,"patient.other_identifier_value");
+        Object identifierTypeNameObject = JsonUtils.readAsObject(patientPayload,"other_identifier_type");
+        Object identifierValueObject =JsonUtils.readAsObject(patientPayload,"other_identifier_value");
 
         if(identifierTypeNameObject instanceof JSONArray) {
             JSONArray identifierTypeName = (JSONArray)identifierTypeNameObject;
@@ -178,9 +176,8 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
             String identifierValue = (String)identifierValueObject;
             PatientIdentifier identifier = createPatientIdentifier(identifierTypeName, identifierValue);
             otherIdentifiers.add(identifier);
-            return otherIdentifiers;
         }
-        return null;
+        return otherIdentifiers;
     }
     private PatientIdentifier createPatientIdentifier(String identifierTypeName,String identifierValue) {
         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByName(identifierTypeName);

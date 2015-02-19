@@ -55,7 +55,7 @@ import java.util.List;
 /**
  */
 @Component
-@Handler(supports = QueueData.class, order = 2)
+@Handler(supports = QueueData.class, order = 5)
 public class JsonEncounterQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "json-encounter";
