@@ -55,9 +55,6 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
 
     private final Patient unsavedPatient = new Patient();
 
-    private PatientService patientService;
-
-
     /**
      * Implementation of how the queue data should be processed.
      *
@@ -84,12 +81,12 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
                 if (unsavedPatient.getNames().isEmpty()) {
                     PatientIdentifier identifier = unsavedPatient.getPatientIdentifier();
                     if (identifier != null) {
-                        List<Patient> patients = patientService.getPatients(identifier.getIdentifier());
+                        List<Patient> patients = Context.getPatientService().getPatients(identifier.getIdentifier());
                         savedPatient = findPatient(patients, unsavedPatient);
                     }
                 } else {
                     PersonName personName = unsavedPatient.getPersonName();
-                    List<Patient> patients = patientService.getPatients(personName.getFullName());
+                    List<Patient> patients = Context.getPatientService().getPatients(personName.getFullName());
                     savedPatient = findPatient(patients, unsavedPatient);
                 }
 
@@ -103,7 +100,7 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
                 if (savedPatient != null) {
                     // if we have a patient already saved with the characteristic found in the registration form:
                 } else {
-                    patientService.savePatient(unsavedPatient);
+                    Context.getPatientService().savePatient(unsavedPatient);
                     // * we will map the temporary uuid to the existing uuid.
                     //assignedUuid = savedPatient.getUuid();
                     assignedUuid = unsavedPatient.getUuid();
@@ -115,23 +112,27 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
     }
 
     private void createPatientFromPayload(final String payload) {
-        String uuid = JsonUtils.readAsString(payload, "$['patient.uuid']");
+        String uuid = JsonUtils.readAsString(payload, "$.patient.['patient.uuid']");
         unsavedPatient.setUuid(uuid);
 
         setPatientIdentifiers(payload);
 
-        Date birthDate = JsonUtils.readAsDate(payload, "$['patient.birthdate']");
+        Date birthDate = JsonUtils.readAsDate(payload, "$.patient.['patient.birth_date']");
         setPatientBirthDate(birthDate);
 
-        boolean birthdateEstimated = JsonUtils.readAsBoolean(payload, "$['patient.birthdate_estimated']");
+        boolean birthdateEstimated = JsonUtils.readAsBoolean(payload, "$.patient.['patient.birthdate_estimated']");
         setPatientBirthDateEstimated(birthdateEstimated);
 
-        String gender = JsonUtils.readAsString(payload, "$['patient.sex']");
+        String gender = JsonUtils.readAsString(payload, "$.patient.['patient.sex']");
         setPatientGender(gender);
 
-        String givenName = JsonUtils.readAsString(payload, "$['patient.given_name']");
-        String middleName = JsonUtils.readAsString(payload, "$['patient.middle_name']");
-        String familyName = JsonUtils.readAsString(payload, "$['patient.family_name']");
+        String givenName = JsonUtils.readAsString(payload, "$.patient.['patient.given_name']");
+        String familyName = JsonUtils.readAsString(payload, "$.patient.['patient.family_name']");
+        String middleName="";
+        try{
+            middleName= JsonUtils.readAsString(payload, "$.patient.['patient.middle_name']");
+        }catch(Exception e){}
+
         addPatientName(givenName, middleName, familyName);
     }
 
@@ -144,13 +145,14 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         if(!otherIdentifiers.isEmpty())
             patientIdentifiers.addAll(otherIdentifiers);
 
-        String locationId = JsonUtils.readAsString(payload, "$['encounter.location_id']");
+        String locationIdString = JsonUtils.readAsString(payload, "$.encounter.['encounter.location_id']");
+        int locationId=Integer.parseInt(locationIdString);
         setIdentifierTypeLocation(patientIdentifiers,locationId);
         unsavedPatient.setIdentifiers(patientIdentifiers);
     }
 
     private PatientIdentifier getPreferredPatientIdentifier(String patientPayload){
-        String identifierValue = JsonUtils.readAsString(patientPayload, "patient.medical_record_number");
+        String identifierValue = JsonUtils.readAsString(patientPayload, "$.patient.['patient.medical_record_number']");
         String identifierTypeName = "AMRS Universal ID";
 
         PatientIdentifier preferredPatientIdentifier = createPatientIdentifier(identifierTypeName, identifierValue);
@@ -158,10 +160,10 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
 
         return preferredPatientIdentifier;
     }
-    private List<PatientIdentifier> getOtherPatientIdentifiers(String patientPayload){
+    private List<PatientIdentifier> getOtherPatientIdentifiers(String payload){
         List<PatientIdentifier> otherIdentifiers = new ArrayList<PatientIdentifier>();
-        Object identifierTypeNameObject = JsonUtils.readAsObject(patientPayload,"other_identifier_type");
-        Object identifierValueObject =JsonUtils.readAsObject(patientPayload,"other_identifier_value");
+        Object identifierTypeNameObject = JsonUtils.readAsObject(payload,"$.observation.other_identifier_type");
+        Object identifierValueObject =JsonUtils.readAsObject(payload,"$.observation.other_identifier_value");
 
         if(identifierTypeNameObject instanceof JSONArray) {
             JSONArray identifierTypeName = (JSONArray)identifierTypeNameObject;
@@ -191,7 +193,7 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         }
     }
 
-    private void setIdentifierTypeLocation(final Set<PatientIdentifier> patientIdentifiers, String locationId){
+    private void setIdentifierTypeLocation(final Set<PatientIdentifier> patientIdentifiers, int locationId){
         Location location = Context.getLocationService().getLocation(locationId);
         if (location == null) {
             throw new QueueProcessorException("Unable to find encounter location using the id: " + locationId);
