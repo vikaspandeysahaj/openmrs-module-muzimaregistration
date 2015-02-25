@@ -27,7 +27,24 @@
             <scope>compile</scope>
         </dependency>
         -->
-        <dependency>
+
+		<dependency>
+			<groupId>com.jayway.jsonpath</groupId>
+			<artifactId>json-path</artifactId>
+			<version>1.2.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.7.10</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-log4j12</artifactId>
+			<version>1.7.10</version>
+		</dependency>
+
+		<dependency>
             <groupId>org.openmrs.module</groupId>
             <artifactId>muzima-omod</artifactId>
         </dependency>
@@ -87,7 +104,7 @@
             <groupId>org.hamcrest</groupId>
             <artifactId>hamcrest-all</artifactId>
         </dependency>
-        <!-- End OpenMRS core -->
+		<!-- End OpenMRS core -->
 	</dependencies>
 	
 	<build>

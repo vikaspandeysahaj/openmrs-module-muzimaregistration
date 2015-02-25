@@ -39,7 +39,7 @@ import java.util.Date;
 /**
  */
 @Component
-@Handler(supports = QueueData.class, order = 2)
+@Handler(supports = QueueData.class, order = 6)
 public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
 
     private static final String DISCRIMINATOR_VALUE = "json-demographics-update";
