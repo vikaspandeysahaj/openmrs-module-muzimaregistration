@@ -69,6 +69,8 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
 
     private LocationService locationService;
 
+    private String temporaryPatientUuid;
+
     /**
      * Implementation of how the queue data should be processed.
      *
@@ -86,7 +88,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
 
         RegistrationData registrationData;
         if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
-            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(unsavedPatient.getUuid());
+            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(getTemporaryPatientUuid());
             if (registrationData == null) {
                 // we can't find registration data for this uuid, process the registration form.
                 patientService = Context.getPatientService();
@@ -107,7 +109,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                 }
 
                 registrationData = new RegistrationData();
-                registrationData.setTemporaryUuid(unsavedPatient.getUuid());
+                registrationData.setTemporaryUuid(getTemporaryPatientUuid());
                 String assignedUuid;
                 // for a new patient we will create mapping:
                 // * temporary uuid --> uuid of the newly created patient
@@ -190,10 +192,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         unsavedPatient.setBirthdate(dob);
                     } else if (tagName.equals("patient.uuid")) {
                         unsavedPatient.setUuid(patientElement.getTextContent());
+                        setTemporaryPatientUuid(patientElement.getTextContent());
                     }else if (tagName.equals("patient.finger")) {
-                        savePatientsFinger(unsavedPatient,patientElement.getTextContent());
+                        savePatientsFinger(unsavedPatient, patientElement.getTextContent());
                     }else if (tagName.equals("patient.fingerprint")) {
-                        savePatientsFingerprint(unsavedPatient,patientElement.getTextContent());
+                        savePatientsFingerprint(unsavedPatient, patientElement.getTextContent());
                     }else if (tagName.equals("amrs_medical_record_number_identifier_type")) {
                         extractIdentifier(unsavedPatient, patientElement, "AMRS Medical Record Number");
                     } else if (tagName.equals("ccc_identifier_type")) {
@@ -257,6 +260,14 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
             throw new QueueProcessorException(e);
         }
         return unsavedPatient;
+    }
+
+    private void setTemporaryPatientUuid(String temporaryUuid){
+        this.temporaryPatientUuid = temporaryUuid;
+    }
+
+    private String getTemporaryPatientUuid(){
+        return temporaryPatientUuid;
     }
 
     private void extractIdentifier(final Patient unsavedPatient, final Element patientElement, final String typeName) {

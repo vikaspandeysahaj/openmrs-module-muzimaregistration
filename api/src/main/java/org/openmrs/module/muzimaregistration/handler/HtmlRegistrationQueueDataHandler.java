@@ -69,17 +69,11 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
     }
 
     private void populateUnsavedPatientFromPayload() {
-        setPatientUuidFromPayload();
         setPatientIdentifiersFromPayload();
         setPatientBirthDateFromPayload();
         setPatientBirthDateEstimatedFromPayload();
         setPatientGenderFromPayload();
         setPatientNameFromPayload();
-    }
-
-    private void setPatientUuidFromPayload(){
-        String uuid = JsonUtils.readAsString(payload, "$.patient.['patient.uuid']");
-        unsavedPatient.setUuid(uuid);
     }
 
     private void setPatientIdentifiersFromPayload(){
@@ -185,10 +179,11 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
 
     private void validateAndRegisterUnsavedPatient(){
         RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
-        RegistrationData registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(unsavedPatient.getUuid());
+        String temporaryUuid = getPatientUuidFromPayload();
+        RegistrationData registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
         if (registrationData == null) {
             registrationData = new RegistrationData();
-            registrationData.setTemporaryUuid(unsavedPatient.getUuid());
+            registrationData.setTemporaryUuid(temporaryUuid);
 
             Patient savedPatient = findSimilarSavedPatient();
             if (savedPatient != null) {
@@ -201,6 +196,10 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
             registrationData.setAssignedUuid(assignedUuid);
             registrationDataService.saveRegistrationData(registrationData);
         }
+    }
+
+    private String getPatientUuidFromPayload(){
+        return JsonUtils.readAsString(payload, "$.patient.['patient.uuid']");
     }
 
     private Patient findSimilarSavedPatient(){
