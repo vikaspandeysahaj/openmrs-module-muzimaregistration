@@ -64,24 +64,37 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
 
     private final Log log = LogFactory.getLog(JsonEncounterQueueDataHandler.class);
 
+    private QueueProcessorException queueProcessorException;
+
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
-        log.info("Processing encounter form data: " + queueData.getUuid());
-        Encounter encounter = new Encounter();
 
-        Object encounterObject = JsonUtils.readAsObject(queueData.getPayload(), "$['encounter']");
-        processEncounter(encounter, encounterObject);
+        try {
+            queueProcessorException = new QueueProcessorException();
+            log.info("Processing encounter form data: " + queueData.getUuid());
+            Encounter encounter = new Encounter();
 
-        Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
-        processPatient(encounter, patientObject);
+            Object encounterObject = JsonUtils.readAsObject(queueData.getPayload(), "$['encounter']");
+            processEncounter(encounter, encounterObject);
 
-        Object obsObject = JsonUtils.readAsObject(queueData.getPayload(), "$['observation']");
-        processObs(encounter, null, obsObject);
+            Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
+            processPatient(encounter, patientObject);
 
-        Context.getEncounterService().saveEncounter(encounter);
+            Object obsObject = JsonUtils.readAsObject(queueData.getPayload(), "$['observation']");
+            processObs(encounter, null, obsObject);
+
+
+            Context.getEncounterService().saveEncounter(encounter);
+        } catch (Exception e) {
+            queueProcessorException.addException(e);
+        } finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
+        }
     }
 
-    private void processPatient(final Encounter encounter, final Object patientObject) throws QueueProcessorException {
+    private void processPatient(final Encounter encounter, final Object patientObject)  {
         Patient unsavedPatient = new Patient();
         String patientPayload = patientObject.toString();
 
@@ -144,11 +157,12 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         }
 
         if (candidatePatient == null) {
-            throw new QueueProcessorException("Unable to uniquely identify patient for this encounter form data. "
-                    + ToStringBuilder.reflectionToString(unsavedPatient));
+            queueProcessorException.addException(new Exception("Unable to uniquely identify patient for this encounter form data. "));
+                    //+ ToStringBuilder.reflectionToString(unsavedPatient)));
         }
-
+        else {
         encounter.setPatient(candidatePatient);
+        }
     }
 
     private Patient findPatient(final List<Patient> patients, final Patient unsavedPatient) {
@@ -181,7 +195,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         return null;
     }
 
-    private void processObs(final Encounter encounter, final Obs parentObs, final Object obsObject) throws QueueProcessorException {
+    private void processObs(final Encounter encounter, final Obs parentObs, final Object obsObject)  {
         if (obsObject instanceof JSONObject) {
             JSONObject obsJsonObject = (JSONObject) obsObject;
             for (String conceptQuestion : obsJsonObject.keySet()) {
@@ -229,9 +243,10 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
             int valueCodedId = Integer.parseInt(valueCodedElements[0]);
             Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
             if (valueCoded == null) {
-                throw new QueueProcessorException("Unable to find concept for value coded with id: " + valueCodedId);
+                queueProcessorException.addException(new Exception("Unable to find concept for value coded with id: " + valueCodedId));
+            }else {
+                obs.setValueCoded(valueCoded);
             }
-            obs.setValueCoded(valueCoded);
         } else if (concept.getDatatype().isText()) {
             obs.setValueText(value);
         }
@@ -276,9 +291,10 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
                 int encounterTypeId = NumberUtils.toInt(encounterTypeString, -999);
                 EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
                 if (encounterType == null) {
-                    throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterTypeString);
+                    queueProcessorException.addException(new Exception("Unable to find encounter type using the id: " + encounterTypeString));
+                }else {
+                    encounter.setEncounterType(encounterType);
                 }
-                encounter.setEncounterType(encounterType);
             }
         } else {
             encounter.setForm(form);
@@ -288,18 +304,21 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         String providerString = JsonUtils.readAsString(encounterPayload, "$['encounter.provider_id']");
         User user = Context.getUserService().getUserByUsername(providerString);
         if (user == null) {
-            throw new QueueProcessorException("Unable to find user using the id: " + providerString);
+            queueProcessorException.addException(new Exception("Unable to find user using the id: " + providerString));
         }
-        encounter.setCreator(user);
-        encounter.setProvider(user);
+        else {
+            encounter.setCreator(user);
+            encounter.setProvider(user);
+        }
 
         String locationString = JsonUtils.readAsString(encounterPayload, "$['encounter.location_id']");
         int locationId = NumberUtils.toInt(locationString, -999);
         Location location = Context.getLocationService().getLocation(locationId);
         if (location == null) {
-            throw new QueueProcessorException("Unable to find encounter location using the id: " + locationString);
+            queueProcessorException.addException(new Exception("Unable to find encounter location using the id: " + locationString));
+        }else {
+            encounter.setLocation(location);
         }
-        encounter.setLocation(location);
 
         Date encounterDatetime = JsonUtils.readAsDate(encounterPayload, "$['encounter.encounter_datetime']");
         encounter.setEncounterDatetime(encounterDatetime);

@@ -71,6 +71,8 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
 
     private String temporaryPatientUuid;
 
+    private QueueProcessorException queueProcessorException;
+
     /**
      * Implementation of how the queue data should be processed.
      *
@@ -81,52 +83,63 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
         log.info("Processing registration form data: " + queueData.getUuid());
-        String payload = queueData.getPayload();
+        queueProcessorException = new QueueProcessorException();
 
-        Patient unsavedPatient = createPatientFromPayload(payload);
-        RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
+        try {
+            String payload = queueData.getPayload();
 
-        RegistrationData registrationData;
-        if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
-            registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(getTemporaryPatientUuid());
-            if (registrationData == null) {
-                // we can't find registration data for this uuid, process the registration form.
-                patientService = Context.getPatientService();
-                locationService = Context.getLocationService();
+            Patient unsavedPatient = createPatientFromPayload(payload);
+            RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
 
-                Patient savedPatient = null;
-                // check whether we already have similar patients!
-                if (unsavedPatient.getNames().isEmpty()) {
-                    PatientIdentifier identifier = unsavedPatient.getPatientIdentifier();
-                    if (identifier != null) {
-                        List<Patient> patients = patientService.getPatients(identifier.getIdentifier());
+            RegistrationData registrationData;
+            if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
+                registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(getTemporaryPatientUuid());
+                if (registrationData == null) {
+                    // we can't find registration data for this uuid, process the registration form.
+                    patientService = Context.getPatientService();
+                    locationService = Context.getLocationService();
+
+                    Patient savedPatient = null;
+                    // check whether we already have similar patients!
+                    if (unsavedPatient.getNames().isEmpty()) {
+                        PatientIdentifier identifier = unsavedPatient.getPatientIdentifier();
+                        if (identifier != null) {
+                            List<Patient> patients = patientService.getPatients(identifier.getIdentifier());
+                            savedPatient = findPatient(patients, unsavedPatient);
+                        }
+                    } else {
+                        PersonName personName = unsavedPatient.getPersonName();
+                        List<Patient> patients = patientService.getPatients(personName.getFullName());
                         savedPatient = findPatient(patients, unsavedPatient);
                     }
-                } else {
-                    PersonName personName = unsavedPatient.getPersonName();
-                    List<Patient> patients = patientService.getPatients(personName.getFullName());
-                    savedPatient = findPatient(patients, unsavedPatient);
-                }
 
-                registrationData = new RegistrationData();
-                registrationData.setTemporaryUuid(getTemporaryPatientUuid());
-                String assignedUuid;
-                // for a new patient we will create mapping:
-                // * temporary uuid --> uuid of the newly created patient
-                // for existing patient we will create mapping:
-                // * temporary uuid --> uuid of the existing patient
-                if (savedPatient != null) {
-                    // if we have a patient already saved with the characteristic found in the registration form:
-                    // * we will map the temporary uuid to the existing uuid.
-                    assignedUuid = savedPatient.getUuid();
-                } else {
-                    patientService.savePatient(unsavedPatient);
-                    assignedUuid = unsavedPatient.getUuid();
+                    registrationData = new RegistrationData();
+                    registrationData.setTemporaryUuid(getTemporaryPatientUuid());
+                    String assignedUuid;
+                    // for a new patient we will create mapping:
+                    // * temporary uuid --> uuid of the newly created patient
+                    // for existing patient we will create mapping:
+                    // * temporary uuid --> uuid of the existing patient
+                    if (savedPatient != null) {
+                        // if we have a patient already saved with the characteristic found in the registration form:
+                        // * we will map the temporary uuid to the existing uuid.
+                        assignedUuid = savedPatient.getUuid();
+                    } else {
+                        patientService.savePatient(unsavedPatient);
+                        assignedUuid = unsavedPatient.getUuid();
+                    }
+                    registrationData.setAssignedUuid(assignedUuid);
+                    registrationDataService.saveRegistrationData(registrationData);
                 }
-                registrationData.setAssignedUuid(assignedUuid);
-                registrationDataService.saveRegistrationData(registrationData);
+            }
+        } catch (Exception e) {
+            queueProcessorException.addException(e);
+        } finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
             }
         }
+
     }
 
     /**
@@ -180,9 +193,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         int identifierTypeId = Integer.parseInt(patientElement.getTextContent());
                         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
                         if (identifierType == null) {
-                            throw new QueueProcessorException("Unable to find patient identifier type with id: " + identifierTypeId);
+                            queueProcessorException.addException(new Exception("Unable to find patient identifier type with id: " + identifierTypeId));
                         }
-                        patientIdentifier.setIdentifierType(identifierType);
+                        else {
+                            patientIdentifier.setIdentifierType(identifierType);
+                        }
                     } else if (tagName.equals("patient.medical_record_number")) {
                         patientIdentifier.setIdentifier(patientElement.getTextContent());
                     } else if (tagName.equals("patient.sex")) {
@@ -219,12 +234,14 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         int personAttributeTypeId = NumberUtils.toInt(tagName.replace("person_attribute", ""));
                         PersonAttributeType personAttributeType = personService.getPersonAttributeType(personAttributeTypeId);
                         if (personAttributeType == null) {
-                            throw new QueueProcessorException("Unable to find attribute type with id: " + personAttributeTypeId);
+                            queueProcessorException.addException(new Exception("Unable to find attribute type with id: " + personAttributeTypeId));
                         }
-                        PersonAttribute personAttribute = new PersonAttribute();
-                        personAttribute.setAttributeType(personAttributeType);
-                        personAttribute.setValue(patientElement.getTextContent());
-                        unsavedPatient.addAttribute(personAttribute);
+                        else {
+                            PersonAttribute personAttribute = new PersonAttribute();
+                            personAttribute.setAttributeType(personAttributeType);
+                            personAttribute.setValue(patientElement.getTextContent());
+                            unsavedPatient.addAttribute(personAttribute);
+                        }
                     }
                 }
             }
@@ -240,9 +257,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         int locationId = Integer.parseInt(encounterElement.getTextContent());
                         Location location = Context.getLocationService().getLocation(locationId);
                         if (location == null) {
-                            throw new QueueProcessorException("Unable to find location with id: " + locationId);
+                            queueProcessorException.addException(new Exception("Unable to find location with id: " + locationId));
                         }
-                        patientIdentifier.setLocation(location);
+                        else {
+                            patientIdentifier.setLocation(location);
+                        }
                         for (PatientIdentifier identifier : unsavedPatient.getIdentifiers()) {
                             identifier.setLocation(location);
                         }
@@ -253,11 +272,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
             unsavedPatient.addName(personName);
             unsavedPatient.addIdentifier(patientIdentifier);
         } catch (ParserConfigurationException e) {
-            throw new QueueProcessorException(e);
+            queueProcessorException.addException(new Exception(e.getMessage()));
         } catch (SAXException e) {
-            throw new QueueProcessorException(e);
+            queueProcessorException.addException(new Exception(e.getMessage()));
         } catch (IOException e) {
-            throw new QueueProcessorException(e);
+            queueProcessorException.addException(new Exception(e.getMessage()));
         }
         return unsavedPatient;
     }
@@ -295,7 +314,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                 patientIdentifier.setIdentifier(identifierValue);
                 unsavedPatient.addIdentifier(patientIdentifier);
             } else {
-                throw new QueueProcessorException("Unable to find identifier type with name: " + typeName);
+                queueProcessorException.addException(new Exception("Unable to find identifier type with name: " + typeName));
             }
         }
     }

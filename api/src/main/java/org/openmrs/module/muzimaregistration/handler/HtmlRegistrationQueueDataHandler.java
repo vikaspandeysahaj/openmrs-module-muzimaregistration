@@ -55,16 +55,28 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
 
     private Patient unsavedPatient;
     private String payload;
+    private QueueProcessorException queueProcessorException;
 
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
         log.info("Processing registration form data: " + queueData.getUuid());
-        payload = queueData.getPayload();
-        unsavedPatient = new Patient();
-        populateUnsavedPatientFromPayload();
+        queueProcessorException = new QueueProcessorException();
+        try {
+            payload = queueData.getPayload();
+            unsavedPatient = new Patient();
+            populateUnsavedPatientFromPayload();
 
-        if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
-            validateAndRegisterUnsavedPatient();
+            if (StringUtils.isNotEmpty(unsavedPatient.getUuid())) {
+                validateAndRegisterUnsavedPatient();
+            }
+        }
+        catch (Exception e){
+            queueProcessorException.addException(e);
+        }
+        finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
         }
     }
 
@@ -130,19 +142,22 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
             patientIdentifier.setIdentifier(identifierValue);
             return patientIdentifier;
         }else{
-            throw new QueueProcessorException("Unable to find identifier type with name: " + identifierTypeName);
+            queueProcessorException.addException(new Exception("Unable to find identifier type with name: " + identifierTypeName));
+            return null;
         }
+
     }
 
     private void setIdentifierTypeLocation(final Set<PatientIdentifier> patientIdentifiers, int locationId){
         Location location = Context.getLocationService().getLocation(locationId);
         if (location == null) {
-            throw new QueueProcessorException("Unable to find encounter location using the id: " + locationId);
-        }
-        Iterator<PatientIdentifier> iterator = patientIdentifiers.iterator();
-        while(iterator.hasNext()) {
-            PatientIdentifier identifier = iterator.next();
-            identifier.setLocation(location);
+            queueProcessorException.addException(new Exception("Unable to find encounter location using the id: " + locationId));
+        }else {
+            Iterator<PatientIdentifier> iterator = patientIdentifiers.iterator();
+            while (iterator.hasNext()) {
+                PatientIdentifier identifier = iterator.next();
+                identifier.setLocation(location);
+            }
         }
     }
 
@@ -187,14 +202,15 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
 
             Patient savedPatient = findSimilarSavedPatient();
             if (savedPatient != null) {
-                throw new QueueProcessorException("Found a patient with similar characteristic :  patientId =" + savedPatient.getPatientId()
-                        + "Identifier Id = "+ savedPatient.getPatientIdentifier().getIdentifier());
+                queueProcessorException.addException(new Exception("Found a patient with similar characteristic :  patientId =" + savedPatient.getPatientId()
+                        + "Identifier Id = "+ savedPatient.getPatientIdentifier().getIdentifier()));
             }
-
-            Context.getPatientService().savePatient(unsavedPatient);
-            String assignedUuid = unsavedPatient.getUuid();
-            registrationData.setAssignedUuid(assignedUuid);
-            registrationDataService.saveRegistrationData(registrationData);
+            else {
+                Context.getPatientService().savePatient(unsavedPatient);
+                String assignedUuid = unsavedPatient.getUuid();
+                registrationData.setAssignedUuid(assignedUuid);
+                registrationDataService.saveRegistrationData(registrationData);
+            }
         }
     }
 
