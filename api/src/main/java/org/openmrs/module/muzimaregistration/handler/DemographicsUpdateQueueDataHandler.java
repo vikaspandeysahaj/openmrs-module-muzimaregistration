@@ -108,4 +108,9 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
     public boolean accept(final QueueData queueData) {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
+
+    @Override
+    public boolean validate(QueueData queueData) {
+        return false;
+    }
 }

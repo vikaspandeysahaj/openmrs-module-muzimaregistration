@@ -153,6 +153,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
 
+    @Override
+    public boolean validate(QueueData queueData) {
+        return false;
+    }
+
     private Date parseDate(final String dateValue) {
         Date date = null;
         try {

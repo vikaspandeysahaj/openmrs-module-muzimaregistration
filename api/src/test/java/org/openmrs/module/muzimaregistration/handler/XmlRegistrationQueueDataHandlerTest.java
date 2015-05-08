@@ -76,16 +76,16 @@ public class XmlRegistrationQueueDataHandlerTest {
         when(patientService.getPatients(anyString())).thenReturn(Arrays.asList(patient1, patient2, patient3));
 
         final String registrationFormData = getPayloadFromFile();
-        Object payload = JsonUtils.readAsObject(registrationFormData, "$['payload']");
-        String temporaryUuid = getValueFromJSON(String.valueOf(payload), "patient.uuid");
+        //Object payload = JsonUtils.readAsObject(registrationFormData, "$['payload']");
+        String temporaryUuid = getValueFromJSON(String.valueOf(registrationFormData), "patient.uuid");
 
         XmlRegistrationQueueDataHandler xmlRegistrationQueueDataHandler = new XmlRegistrationQueueDataHandler();
 
         final QueueData queueData = new QueueData();
-        queueData.setPayload(String.valueOf(payload));
+        queueData.setPayload(String.valueOf(registrationFormData));
         xmlRegistrationQueueDataHandler.process(queueData);
 
-        String identifier = getValueFromJSON(String.valueOf(payload), "patient.medical_record_number");
+        String identifier = getValueFromJSON(String.valueOf(registrationFormData), "patient.medical_record_number");
 
         verify(patientService).getPatientIdentifierType(anyInt());
         verify(patientService).getPatients(identifier);
@@ -148,7 +148,7 @@ public class XmlRegistrationQueueDataHandlerTest {
     }
 
     private String getValueFromJSON(final String payload, final String name) {
-        return  JsonUtils.readAsString(payload, "$['" + name + "']");
+        return  JsonUtils.readAsString(payload, "$.payload['" + name + "']");
     }
 
 
