@@ -71,9 +71,40 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
 
     private final Log log = LogFactory.getLog(XmlEncounterQueueDataHandler.class);
 
+    private QueueProcessorException queueProcessorException;
+
+    private Encounter encounter;
+
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
+
+        log.info("Processing registration form data: " + queueData.getUuid());
+        encounter = new Encounter();
+        try {
+            if (validate(queueData)) {
+                Context.getEncounterService().saveEncounter(encounter);
+            }
+        }
+        catch (Exception e){
+            if(!e.getClass().equals(QueueProcessorException.class)) {
+                queueProcessorException.addException(e);
+            }
+        }
+        finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
+        }
+
+
+    }
+
+    @Override
+    public boolean validate(QueueData queueData) {
+
         log.info("Processing encounter form data: " + queueData.getUuid());
+        queueProcessorException = new QueueProcessorException();
+
         String payload = queueData.getPayload();
 
         try {
@@ -84,21 +115,21 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
             Element element = document.getDocumentElement();
             element.normalize();
 
-            Encounter encounter = new Encounter();
             // we need to get the form id to get the encounter type associated with this form from the form record.
             encounter.setEncounterType(Context.getEncounterService().getEncounterType(1));
 
             processPatient(encounter, document.getElementsByTagName("patient"));
             processEncounter(encounter, document.getElementsByTagName("encounter"));
             processObs(encounter, document.getElementsByTagName("obs"));
+            return true;
 
-            Context.getEncounterService().saveEncounter(encounter);
-        } catch (ParserConfigurationException e) {
-            throw new QueueProcessorException(e);
-        } catch (SAXException e) {
-            throw new QueueProcessorException(e);
-        } catch (IOException e) {
-            throw new QueueProcessorException(e);
+        } catch (Exception e) {
+            queueProcessorException.addException(e);
+            return false;
+        } finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
         }
     }
 
@@ -157,8 +188,8 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
         }
 
         if (candidatePatient == null) {
-            throw new QueueProcessorException("Unable to uniquely identify patient for this encounter form data. "
-                    + ToStringBuilder.reflectionToString(unsavedPatient));
+            queueProcessorException.addException(new Exception("Unable to uniquely identify patient for this encounter form data. "
+                    + ToStringBuilder.reflectionToString(unsavedPatient)));
         }
 
         encounter.setPatient(candidatePatient);
@@ -272,7 +303,7 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                         int valueCodedId = Integer.parseInt(valueCodedElements[0]);
                         Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
                         if (valueCoded == null) {
-                            throw new QueueProcessorException("Unable to find concept for value coded with id: " + valueCodedId);
+                            queueProcessorException.addException(new Exception("Unable to find concept for value coded with id: " + valueCodedId));
                         }
                         obs.setValueCoded(valueCoded);
                     } else if (concept.getDatatype().isText()) {
@@ -304,7 +335,7 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                             int valueCodedId = Integer.parseInt(valueCodedElements[0]);
                             Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
                             if (valueCoded == null) {
-                                throw new QueueProcessorException("Unable to find concept for value coded with id: " + valueCodedId);
+                                queueProcessorException.addException(new Exception("Unable to find concept for value coded with id: " + valueCodedId));
                             }
                             obs.setValueCoded(valueCoded);
 
@@ -334,13 +365,13 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                     int locationId = NumberUtils.toInt(encounterElementValue, -999);
                     Location location = Context.getLocationService().getLocation(locationId);
                     if (location == null) {
-                        throw new QueueProcessorException("Unable to find encounter location using the id: " + encounterElementValue);
+                        queueProcessorException.addException(new Exception("Unable to find encounter location using the id: " + encounterElementValue));
                     }
                     encounter.setLocation(location);
                 } else if (encounterElement.getTagName().equals("encounter.provider_id")) {
                     User user = Context.getUserService().getUserByUsername(encounterElementValue);
                     if (user == null) {
-                        throw new QueueProcessorException("Unable to find user using the id: " + encounterElementValue);
+                        queueProcessorException.addException(new Exception("Unable to find user using the id: " + encounterElementValue));
                     }
                     encounter.setProvider(user);
                     encounter.setCreator(user);
@@ -365,7 +396,7 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
                         int encounterTypeId = NumberUtils.toInt(encounterElementValue, -999);
                         EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
                         if (encounterType == null) {
-                            throw new QueueProcessorException("Unable to find encounter type using the id: " + encounterElementValue);
+                            queueProcessorException.addException(new Exception("Unable to find encounter type using the id: " + encounterElementValue));
                         }
                         encounter.setEncounterType(encounterType);
                     }
@@ -389,8 +420,5 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
 
-    @Override
-    public boolean validate(QueueData queueData) {
-        return false;
-    }
+
 }

@@ -45,18 +45,53 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
     private static final String DISCRIMINATOR_VALUE = "json-demographics-update";
     private static final DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd");
     private final Log log = LogFactory.getLog(DemographicsUpdateQueueDataHandler.class);
+    private QueueProcessorException queueProcessorException;
+    private Patient unsavedPatient;
 
     @Override
     public void process(final QueueData queueData) throws QueueProcessorException {
         log.info("Processing demographics update form data: " + queueData.getUuid());
-        Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
-        processPatient(patientObject);
+        try {
+            if (validate(queueData)) {
+                Context.getPatientService().savePatient(unsavedPatient);
+            }
+        }
+        catch (Exception e){
+            if(!e.getClass().equals(QueueProcessorException.class)) {
+                queueProcessorException.addException(e);
+            }
+        }
+        finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
+        }
+    }
+
+    @Override
+    public boolean validate(QueueData queueData) {
+        log.info("Processing registration form data: " + queueData.getUuid());
+        queueProcessorException = new QueueProcessorException();
+
+        try {
+            Object patientObject = JsonUtils.readAsObject(queueData.getPayload(), "$['patient']");
+            processPatient(patientObject);
+            return true;
+
+        } catch (Exception e) {
+            queueProcessorException.addException(e);
+            return false;
+        } finally {
+            if (queueProcessorException.anyExceptions()) {
+                throw queueProcessorException;
+            }
+        }
     }
 
     private void processPatient(final Object patientObject) throws QueueProcessorException {
         String patientPayload = patientObject.toString();
         String uuid = JsonUtils.readAsString(patientPayload, "$['patient.uuid']");
-        Patient unsavedPatient = Context.getPatientService().getPatientByUuid(uuid);
+        unsavedPatient = Context.getPatientService().getPatientByUuid(uuid);
         PatientService patientService = Context.getPatientService();
         PatientIdentifierType defaultIdentifierType = patientService.getPatientIdentifierType(1);
         String identifier = JsonUtils.readAsString(patientPayload, "$['patient.medical_record_number']");
@@ -101,7 +136,6 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
             fingerprintAttribute.setValue(patientsFingerprint);
             unsavedPatient.addAttribute(fingerprintAttribute);
         }
-        Context.getPatientService().savePatient(unsavedPatient);
     }
 
     @Override
@@ -109,8 +143,5 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
 
-    @Override
-    public boolean validate(QueueData queueData) {
-        return false;
-    }
+
 }
