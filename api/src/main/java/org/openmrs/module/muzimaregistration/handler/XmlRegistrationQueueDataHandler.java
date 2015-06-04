@@ -74,6 +74,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
     private QueueProcessorException queueProcessorException;
 
     private Patient unsavedPatient;
+
     /**
      * Implementation of how the queue data should be processed.
      *
@@ -89,20 +90,18 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
             if (validate(queueData)) {
                 saveRegistrationData();
             }
-        }
-        catch (Exception e){
-            if(!e.getClass().equals(QueueProcessorException.class)) {
+        } catch (Exception e) {
+            if (!e.getClass().equals(QueueProcessorException.class)) {
                 queueProcessorException.addException(e);
             }
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
         }
     }
 
-    private void saveRegistrationData(){
+    private void saveRegistrationData() {
 
         RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
         RegistrationData registrationData;
@@ -219,8 +218,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierType(identifierTypeId);
                         if (identifierType == null) {
                             queueProcessorException.addException(new Exception("Unable to find patient identifier type with id: " + identifierTypeId));
-                        }
-                        else {
+                        } else {
                             patientIdentifier.setIdentifierType(identifierType);
                         }
                     } else if (tagName.equals("patient.medical_record_number")) {
@@ -233,11 +231,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                     } else if (tagName.equals("patient.uuid")) {
                         unsavedPatient.setUuid(patientElement.getTextContent());
                         setTemporaryPatientUuid(patientElement.getTextContent());
-                    }else if (tagName.equals("patient.finger")) {
+                    } else if (tagName.equals("patient.finger")) {
                         savePatientsFinger(unsavedPatient, patientElement.getTextContent());
-                    }else if (tagName.equals("patient.fingerprint")) {
+                    } else if (tagName.equals("patient.fingerprint")) {
                         savePatientsFingerprint(unsavedPatient, patientElement.getTextContent());
-                    }else if (tagName.equals("amrs_medical_record_number_identifier_type")) {
+                    } else if (tagName.equals("amrs_medical_record_number_identifier_type")) {
                         extractIdentifier(unsavedPatient, patientElement, "AMRS Medical Record Number");
                     } else if (tagName.equals("ccc_identifier_type")) {
                         extractIdentifier(unsavedPatient, patientElement, "CCC Number ");
@@ -260,8 +258,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         PersonAttributeType personAttributeType = personService.getPersonAttributeType(personAttributeTypeId);
                         if (personAttributeType == null) {
                             queueProcessorException.addException(new Exception("Unable to find attribute type with id: " + personAttributeTypeId));
-                        }
-                        else {
+                        } else {
                             PersonAttribute personAttribute = new PersonAttribute();
                             personAttribute.setAttributeType(personAttributeType);
                             personAttribute.setValue(patientElement.getTextContent());
@@ -283,8 +280,7 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
                         Location location = Context.getLocationService().getLocation(locationId);
                         if (location == null) {
                             queueProcessorException.addException(new Exception("Unable to find location with id: " + locationId));
-                        }
-                        else {
+                        } else {
                             patientIdentifier.setLocation(location);
                         }
                         for (PatientIdentifier identifier : unsavedPatient.getIdentifiers()) {
@@ -306,11 +302,11 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
         return unsavedPatient;
     }
 
-    private void setTemporaryPatientUuid(String temporaryUuid){
+    private void setTemporaryPatientUuid(String temporaryUuid) {
         this.temporaryPatientUuid = temporaryUuid;
     }
 
-    private String getTemporaryPatientUuid(){
+    private String getTemporaryPatientUuid() {
         return temporaryPatientUuid;
     }
 
@@ -375,22 +371,21 @@ public class XmlRegistrationQueueDataHandler implements QueueDataHandler {
     }
 
     private void savePatientsFinger(final Patient unsavedPatient, final String value) {
-         PersonService personService = Context.getPersonService();
-        PersonAttributeType fingerAttributeType= personService.getPersonAttributeTypeByName("finger");
+        PersonService personService = Context.getPersonService();
+        PersonAttributeType fingerAttributeType = personService.getPersonAttributeTypeByName("finger");
         PersonAttribute fingerAttribute = new PersonAttribute();
         fingerAttribute.setAttributeType(fingerAttributeType);
         fingerAttribute.setValue(value);
         unsavedPatient.addAttribute(fingerAttribute);
     }
 
-     private void savePatientsFingerprint(final Patient unsavedPatient, final String value) {
-         PersonService personService = Context.getPersonService();
-        PersonAttributeType fingerprintAttributeType= personService.getPersonAttributeTypeByName("fingerprint");
+    private void savePatientsFingerprint(final Patient unsavedPatient, final String value) {
+        PersonService personService = Context.getPersonService();
+        PersonAttributeType fingerprintAttributeType = personService.getPersonAttributeTypeByName("fingerprint");
         PersonAttribute fingerprintAttribute = new PersonAttribute();
         fingerprintAttribute.setAttributeType(fingerprintAttributeType);
         fingerprintAttribute.setValue(value);
         unsavedPatient.addAttribute(fingerprintAttribute);
 
     }
-
 }

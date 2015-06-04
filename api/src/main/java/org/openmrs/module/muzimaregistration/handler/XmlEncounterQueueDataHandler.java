@@ -84,13 +84,11 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
             if (validate(queueData)) {
                 Context.getEncounterService().saveEncounter(encounter);
             }
-        }
-        catch (Exception e){
-            if(!e.getClass().equals(QueueProcessorException.class)) {
+        } catch (Exception e) {
+            if (!e.getClass().equals(QueueProcessorException.class)) {
                 queueProcessorException.addException(e);
             }
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
@@ -419,6 +417,5 @@ public class XmlEncounterQueueDataHandler implements QueueDataHandler {
     public boolean accept(final QueueData queueData) {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
-
-
 }
+

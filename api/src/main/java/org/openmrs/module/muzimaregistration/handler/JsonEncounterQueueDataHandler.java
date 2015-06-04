@@ -89,8 +89,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         } catch (Exception e) {
             queueProcessorException.addException(e);
             return false;
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
@@ -105,7 +104,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
                 Context.getEncounterService().saveEncounter(encounter);
             }
         } catch (Exception e) {
-            if(!e.getClass().equals(QueueProcessorException.class))
+            if (!e.getClass().equals(QueueProcessorException.class))
                 queueProcessorException.addException(e);
         } finally {
             if (queueProcessorException.anyExceptions()) {
@@ -114,7 +113,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         }
     }
 
-    private void processPatient(final Encounter encounter, final Object patientObject)  {
+    private void processPatient(final Encounter encounter, final Object patientObject) {
         Patient unsavedPatient = new Patient();
         String patientPayload = patientObject.toString();
 
@@ -178,10 +177,9 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
 
         if (candidatePatient == null) {
             queueProcessorException.addException(new Exception("Unable to uniquely identify patient for this encounter form data. "));
-                    //+ ToStringBuilder.reflectionToString(unsavedPatient)));
-        }
-        else {
-        encounter.setPatient(candidatePatient);
+            //+ ToStringBuilder.reflectionToString(unsavedPatient)));
+        } else {
+            encounter.setPatient(candidatePatient);
         }
     }
 
@@ -215,7 +213,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         return null;
     }
 
-    private void processObs(final Encounter encounter, final Obs parentObs, final Object obsObject)  {
+    private void processObs(final Encounter encounter, final Obs parentObs, final Object obsObject) {
         if (obsObject instanceof JSONObject) {
             JSONObject obsJsonObject = (JSONObject) obsObject;
             for (String conceptQuestion : obsJsonObject.keySet()) {
@@ -264,7 +262,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
             Concept valueCoded = Context.getConceptService().getConcept(valueCodedId);
             if (valueCoded == null) {
                 queueProcessorException.addException(new Exception("Unable to find concept for value coded with id: " + valueCodedId));
-            }else {
+            } else {
                 obs.setValueCoded(valueCoded);
             }
         } else if (concept.getDatatype().isText()) {
@@ -312,7 +310,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
                 EncounterType encounterType = Context.getEncounterService().getEncounterType(encounterTypeId);
                 if (encounterType == null) {
                     queueProcessorException.addException(new Exception("Unable to find encounter type using the id: " + encounterTypeString));
-                }else {
+                } else {
                     encounter.setEncounterType(encounterType);
                 }
             }
@@ -325,8 +323,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         User user = Context.getUserService().getUserByUsername(providerString);
         if (user == null) {
             queueProcessorException.addException(new Exception("Unable to find user using the id: " + providerString));
-        }
-        else {
+        } else {
             encounter.setCreator(user);
             encounter.setProvider(user);
         }
@@ -336,7 +333,7 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         Location location = Context.getLocationService().getLocation(locationId);
         if (location == null) {
             queueProcessorException.addException(new Exception("Unable to find encounter location using the id: " + locationString));
-        }else {
+        } else {
             encounter.setLocation(location);
         }
 
@@ -359,3 +356,4 @@ public class JsonEncounterQueueDataHandler implements QueueDataHandler {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
 }
+

@@ -55,13 +55,11 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
             if (validate(queueData)) {
                 Context.getPatientService().savePatient(unsavedPatient);
             }
-        }
-        catch (Exception e){
-            if(!e.getClass().equals(QueueProcessorException.class)) {
+        } catch (Exception e) {
+            if (!e.getClass().equals(QueueProcessorException.class)) {
                 queueProcessorException.addException(e);
             }
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
@@ -142,6 +140,4 @@ public class DemographicsUpdateQueueDataHandler implements QueueDataHandler {
     public boolean accept(final QueueData queueData) {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
-
-
 }

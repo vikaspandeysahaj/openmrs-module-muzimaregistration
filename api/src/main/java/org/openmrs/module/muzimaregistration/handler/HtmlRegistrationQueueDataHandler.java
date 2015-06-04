@@ -63,15 +63,15 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         queueProcessorException = new QueueProcessorException();
         try {
             if (validate(queueData)) {
-                RegisterUnsavedPatient();
+                registerUnsavedPatient();
             }
-        }
-        catch (Exception e){
-            if(!e.getClass().equals(QueueProcessorException.class)) {
+        } catch (Exception e) {
+            /*Custom exception thrown by the validate function should not be added again into @queueProcessorException.
+             It should add the runtime dao Exception while saving the data into @queueProcessorException collection */
+            if (!e.getClass().equals(QueueProcessorException.class)) {
                 queueProcessorException.addException(e);
             }
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
@@ -88,12 +88,10 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
             populateUnsavedPatientFromPayload();
             validateUnsavedPatient();
             return true;
-        }
-        catch (Exception e){
+        } catch (Exception e) {
             queueProcessorException.addException(e);
             return false;
-        }
-        finally {
+        } finally {
             if (queueProcessorException.anyExceptions()) {
                 throw queueProcessorException;
             }
@@ -103,8 +101,8 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
     private void validateUnsavedPatient() {
         Patient savedPatient = findSimilarSavedPatient();
         if (savedPatient != null) {
-            queueProcessorException.addException(new Exception("Found a patient with similar characteristic :  patientId =" + savedPatient.getPatientId()
-                    + "Identifier Id = "+ savedPatient.getPatientIdentifier().getIdentifier()));
+            queueProcessorException.addException(new Exception("Found a patient with similar characteristic :  patientId = " + savedPatient.getPatientId()
+                    + " Identifier Id = " + savedPatient.getPatientIdentifier().getIdentifier()));
         }
     }
 
@@ -117,67 +115,65 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         setPatientNameFromPayload();
     }
 
-    private void setPatientIdentifiersFromPayload(){
+    private void setPatientIdentifiersFromPayload() {
         Set<PatientIdentifier> patientIdentifiers = new HashSet<PatientIdentifier>();
         PatientIdentifier preferredIdentifier = getPreferredPatientIdentifierFromPayload();
-        if(preferredIdentifier!=null) {
+        if (preferredIdentifier != null) {
             patientIdentifiers.add(preferredIdentifier);
         }
         List<PatientIdentifier> otherIdentifiers = getOtherPatientIdentifiersFromPayload();
-        if(!otherIdentifiers.isEmpty()) {
+        if (!otherIdentifiers.isEmpty()) {
             patientIdentifiers.addAll(otherIdentifiers);
         }
         setIdentifierTypeLocation(patientIdentifiers);
-
         unsavedPatient.setIdentifiers(patientIdentifiers);
     }
 
-    private PatientIdentifier getPreferredPatientIdentifierFromPayload(){
+    private PatientIdentifier getPreferredPatientIdentifierFromPayload() {
         String identifierValue = JsonUtils.readAsString(payload, "$.patient.['patient.medical_record_number']");
         String identifierTypeName = "AMRS Universal ID";
 
         PatientIdentifier preferredPatientIdentifier = createPatientIdentifier(identifierTypeName, identifierValue);
-        if(preferredPatientIdentifier!=null)
-        {   preferredPatientIdentifier.setPreferred(true);
+        if (preferredPatientIdentifier != null) {
+            preferredPatientIdentifier.setPreferred(true);
             return preferredPatientIdentifier;
-        }
-        else {
+        } else {
             return null;
         }
     }
-    private List<PatientIdentifier> getOtherPatientIdentifiersFromPayload(){
-        List<PatientIdentifier> otherIdentifiers = new ArrayList<PatientIdentifier>();
-        Object identifierTypeNameObject = JsonUtils.readAsObject(payload,"$.observation.other_identifier_type");
-        Object identifierValueObject =JsonUtils.readAsObject(payload,"$.observation.other_identifier_value");
 
-        if(identifierTypeNameObject instanceof JSONArray) {
-            JSONArray identifierTypeName = (JSONArray)identifierTypeNameObject;
-            JSONArray identifierValue = (JSONArray)identifierValueObject;
+    private List<PatientIdentifier> getOtherPatientIdentifiersFromPayload() {
+        List<PatientIdentifier> otherIdentifiers = new ArrayList<PatientIdentifier>();
+        Object identifierTypeNameObject = JsonUtils.readAsObject(payload, "$.observation.other_identifier_type");
+        Object identifierValueObject = JsonUtils.readAsObject(payload, "$.observation.other_identifier_value");
+
+        if (identifierTypeNameObject instanceof JSONArray) {
+            JSONArray identifierTypeName = (JSONArray) identifierTypeNameObject;
+            JSONArray identifierValue = (JSONArray) identifierValueObject;
             for (int i = 0; i < identifierTypeName.size(); i++) {
                 PatientIdentifier identifier = createPatientIdentifier(identifierTypeName.get(i).toString(), identifierValue.get(i).toString());
-                if(identifier != null) {
+                if (identifier != null) {
                     otherIdentifiers.add(identifier);
                 }
             }
-        }else if(identifierTypeNameObject instanceof String){
-            String identifierTypeName = (String)identifierTypeNameObject;
-            String identifierValue = (String)identifierValueObject;
+        } else if (identifierTypeNameObject instanceof String) {
+            String identifierTypeName = (String) identifierTypeNameObject;
+            String identifierValue = (String) identifierValueObject;
             PatientIdentifier identifier = createPatientIdentifier(identifierTypeName, identifierValue);
-            if(identifier != null) {
+            if (identifier != null) {
                 otherIdentifiers.add(identifier);
             }
         }
         return otherIdentifiers;
     }
-    private PatientIdentifier createPatientIdentifier(String identifierTypeName,String identifierValue) {
+
+    private PatientIdentifier createPatientIdentifier(String identifierTypeName, String identifierValue) {
         PatientIdentifierType identifierType = Context.getPatientService().getPatientIdentifierTypeByName(identifierTypeName);
         if (identifierType == null) {
             queueProcessorException.addException(new Exception("Unable to find identifier type with name: " + identifierTypeName));
-        }
-        else if (identifierValue==null) {
-            queueProcessorException.addException(new Exception("Identifier value can't be null" + identifierTypeName));
-        }
-        else {
+        } else if (identifierValue == null) {
+            queueProcessorException.addException(new Exception("Identifier value can't be null type: " + identifierTypeName));
+        } else {
             PatientIdentifier patientIdentifier = new PatientIdentifier();
             patientIdentifier.setIdentifierType(identifierType);
             patientIdentifier.setIdentifier(identifierValue);
@@ -186,13 +182,13 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         return null;
     }
 
-    private void setIdentifierTypeLocation(final Set<PatientIdentifier> patientIdentifiers){
+    private void setIdentifierTypeLocation(final Set<PatientIdentifier> patientIdentifiers) {
         String locationIdString = JsonUtils.readAsString(payload, "$.encounter.['encounter.location_id']");
-        int locationId=Integer.parseInt(locationIdString);
+        int locationId = Integer.parseInt(locationIdString);
         Location location = Context.getLocationService().getLocation(locationId);
         if (location == null) {
             queueProcessorException.addException(new Exception("Unable to find encounter location using the id: " + locationId));
-        }else {
+        } else {
             Iterator<PatientIdentifier> iterator = patientIdentifiers.iterator();
             while (iterator.hasNext()) {
                 PatientIdentifier identifier = iterator.next();
@@ -201,38 +197,38 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         }
     }
 
-    private void setPatientBirthDateFromPayload(){
+    private void setPatientBirthDateFromPayload() {
         Date birthDate = JsonUtils.readAsDate(payload, "$.patient.['patient.birth_date']");
         unsavedPatient.setBirthdate(birthDate);
     }
 
-    private void setPatientBirthDateEstimatedFromPayload(){
+    private void setPatientBirthDateEstimatedFromPayload() {
         boolean birthdateEstimated = JsonUtils.readAsBoolean(payload, "$.patient.['patient.birthdate_estimated']");
         unsavedPatient.setBirthdateEstimated(birthdateEstimated);
     }
 
-    private void setPatientGenderFromPayload(){
+    private void setPatientGenderFromPayload() {
         String gender = JsonUtils.readAsString(payload, "$.patient.['patient.sex']");
         unsavedPatient.setGender(gender);
     }
 
-    private void setPatientNameFromPayload(){
+    private void setPatientNameFromPayload() {
         String givenName = JsonUtils.readAsString(payload, "$.patient.['patient.given_name']");
         String familyName = JsonUtils.readAsString(payload, "$.patient.['patient.family_name']");
-        String middleName="";
-        try{
-            middleName= JsonUtils.readAsString(payload, "$.patient.['patient.middle_name']");
-        }catch(Exception e){}
+        String middleName = "";
+        try {
+            middleName = JsonUtils.readAsString(payload, "$.patient.['patient.middle_name']");
+        } catch (Exception e) {
+        }
 
         PersonName personName = new PersonName();
         personName.setGivenName(givenName);
         personName.setMiddleName(middleName);
         personName.setFamilyName(familyName);
-
         unsavedPatient.addName(personName);
     }
 
-    private void RegisterUnsavedPatient(){
+    private void registerUnsavedPatient() {
         RegistrationDataService registrationDataService = Context.getService(RegistrationDataService.class);
         String temporaryUuid = getPatientUuidFromPayload();
         RegistrationData registrationData = registrationDataService.getRegistrationDataByTemporaryUuid(temporaryUuid);
@@ -246,11 +242,11 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
         }
     }
 
-    private String getPatientUuidFromPayload(){
+    private String getPatientUuidFromPayload() {
         return JsonUtils.readAsString(payload, "$.patient.['patient.uuid']");
     }
 
-    private Patient findSimilarSavedPatient(){
+    private Patient findSimilarSavedPatient() {
         Patient savedPatient = null;
         if (unsavedPatient.getNames().isEmpty()) {
             PatientIdentifier identifier = unsavedPatient.getPatientIdentifier();
@@ -300,5 +296,4 @@ public class HtmlRegistrationQueueDataHandler implements QueueDataHandler {
     public boolean accept(final QueueData queueData) {
         return StringUtils.equals(DISCRIMINATOR_VALUE, queueData.getDiscriminator());
     }
-
 }
